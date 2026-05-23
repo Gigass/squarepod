@@ -1609,7 +1609,7 @@ const playbackModeLabel = (mode: PlaybackMode = 'sequential', locale: Locale = '
 const enabledLabel = (enabled = true, locale: Locale = 'en') => enabled ? t(locale, 'on') : t(locale, 'off');
 
 const backlightLabel = (value: string | undefined, locale: Locale) => (
-  value === 'Always On' ? t(locale, 'alwaysOn') : value || '1m'
+  value === 'Always On' ? t(locale, 'alwaysOn') : value || t(locale, 'alwaysOn')
 );
 
 const deviceModeLabel = (mode: DeviceMode | undefined, locale: Locale) => {
@@ -2047,12 +2047,40 @@ const generateSettingsMenu = (local: LocalMusicMenuState = {}): MenuNode => {
     previewIcon: <Settings className="w-16 h-16 text-gray-400" />,
     children: [
       {
+        id: 'set_mode_nano6',
+        title: tx(locale, 'Nano6 Mode', 'Nano6 模式'),
+        type: 'localMusicStatus',
+        action: 'settings_set_device_mode',
+        settingKey: 'nano6Touch',
+        statusTone: local.deviceMode === 'nano6Touch' ? 'success' : 'neutral',
+        detailLines: [
+          deviceModeLabel('nano6Touch', locale),
+          local.deviceMode === 'nano6Touch'
+            ? tx(locale, 'Current active mode.', '当前正在使用。')
+            : tx(locale, 'Select to switch immediately.', '选择后立即切换。'),
+        ],
+      },
+      {
+        id: 'set_mode_classic',
+        title: tx(locale, 'Classic Mode', 'Classic 模式'),
+        type: 'localMusicStatus',
+        action: 'settings_set_device_mode',
+        settingKey: 'clickWheel',
+        statusTone: local.deviceMode === 'clickWheel' ? 'success' : 'neutral',
+        detailLines: [
+          deviceModeLabel('clickWheel', locale),
+          local.deviceMode === 'clickWheel'
+            ? tx(locale, 'Current active mode.', '当前正在使用。')
+            : tx(locale, 'Select to switch immediately.', '选择后立即切换。'),
+        ],
+      },
+      {
         id: 'set_about',
         title: t(locale, 'about'),
         type: 'about',
         previewIcon: <Info className="w-16 h-16" />,
         detailLines: [
-          'Version: V1.4',
+          'Version: V1.5',
           'Devices: Nano6 + Classic',
           `${t(locale, 'allSongs')}: ${trackCount}`,
           `${t(locale, 'artists')}: ${artistCount}`,
@@ -2121,25 +2149,14 @@ const generateSettingsMenu = (local: LocalMusicMenuState = {}): MenuNode => {
         type: 'menu',
         children: [
           {
-            id: 'set_device_mode',
-            title: `${tx(locale, 'Control Mode', '控制模式')}: ${deviceModeLabel(local.deviceMode, locale)}`,
-            type: 'localMusicStatus',
-            action: 'settings_cycle_device_mode',
-            statusTone: local.deviceMode === 'nano6Touch' ? 'success' : 'neutral',
-            detailLines: [
-              deviceModeLabel(local.deviceMode, locale),
-              `${deviceModeLabel('clickWheel', locale)} / ${deviceModeLabel('nano6Touch', locale)}`,
-            ],
-          },
-          {
             id: 'set_click_sound',
-            title: `${t(locale, 'clickSound')}: ${formatPercent(local.uiSoundVolume ?? 0.65)}`,
+            title: `${t(locale, 'clickSound')}: ${formatPercent(local.uiSoundVolume ?? 1)}`,
             type: 'localMusicStatus',
             action: 'settings_cycle_click_sound',
             previewIcon: <Volume2 className="w-16 h-16" />,
             statusTone: 'neutral',
             detailLines: [
-              `${t(locale, 'clickSound')}: ${formatPercent(local.uiSoundVolume ?? 0.65)}`,
+              `${t(locale, 'clickSound')}: ${formatPercent(local.uiSoundVolume ?? 1)}`,
               `${t(locale, 'off')} / 25 / 50 / 75 / 100`,
             ],
           },

@@ -37,6 +37,7 @@ export type MenuAction =
   | 'player_shuffle_all'
   | 'settings_cycle_click_sound'
   | 'settings_cycle_device_mode'
+  | 'settings_set_device_mode'
   | 'settings_toggle_auto_scan'
   | 'settings_cycle_playback_mode'
   | 'settings_reset'

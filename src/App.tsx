@@ -66,9 +66,12 @@ const COMPILATIONS_KEY = 'squarepod.compilations.v1';
 const LANGUAGE_KEY = 'squarepod.language.v1';
 const DEVICE_MODE_KEY = 'squarepod.deviceMode.v1';
 const NANO6_WALLPAPER_KEY = 'squarepod.nano6Wallpaper.v1';
+const SETTINGS_DEFAULTS_VERSION_KEY = 'squarepod.settingsDefaultsVersion.v1';
 const PLAYBACK_MODE_ORDER: PlaybackMode[] = ['sequential', 'shuffle', 'repeatAll', 'repeatOne'];
 const UI_SOUND_VOLUME_STEPS = [0, 0.25, 0.5, 0.75, 1];
-const DEFAULT_UI_SOUND_VOLUME = 0.65;
+const DEFAULT_UI_SOUND_VOLUME = 1;
+const DEFAULT_BACKLIGHT_TIMER = 'Always On';
+const SETTINGS_DEFAULTS_VERSION = '1.5';
 const BACKLIGHT_TIMER_ORDER = ['30s', '1m', '2m', 'Always On'];
 const EQ_ORDER = ['Off', 'Bass Boost', 'Treble Boost', 'Spoken Word'];
 const SEEK_STEP_SECONDS = 10;
@@ -420,7 +423,7 @@ export default function App() {
   const [mainMenuOrder, setMainMenuOrder] = useState<string[]>(() => normalizeMainMenuOrder(readArray(MAIN_MENU_ORDER_KEY)));
   const [mainMenuDraftOrder, setMainMenuDraftOrder] = useState<string[]>();
   const [mainMenuReorderKey, setMainMenuReorderKey] = useState<string>();
-  const [backlightTimer, setBacklightTimer] = useState(() => readString(BACKLIGHT_TIMER_KEY, '1m'));
+  const [backlightTimer, setBacklightTimer] = useState(() => readString(BACKLIGHT_TIMER_KEY, DEFAULT_BACKLIGHT_TIMER));
   const [eqPreset, setEqPreset] = useState(() => readString(EQ_KEY, 'Off'));
   const [compilationsEnabled, setCompilationsEnabled] = useState(() => readBoolean(COMPILATIONS_KEY, true));
   const [language, setLanguage] = useState<Locale>(() => normalizeLocale(readString(LANGUAGE_KEY, 'en')));
@@ -627,6 +630,16 @@ export default function App() {
     setUiSoundVolume(uiSoundVolume);
     writeUiSoundVolume(uiSoundVolume);
   }, [uiSoundVolume]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.localStorage.getItem(SETTINGS_DEFAULTS_VERSION_KEY) === SETTINGS_DEFAULTS_VERSION) return;
+
+    // V1.5 changes the shipped defaults and should take effect on the first launch after install/update.
+    setUiSoundVolumeState(DEFAULT_UI_SOUND_VOLUME);
+    setBacklightTimer(DEFAULT_BACKLIGHT_TIMER);
+    window.localStorage.setItem(SETTINGS_DEFAULTS_VERSION_KEY, SETTINGS_DEFAULTS_VERSION);
+  }, []);
 
   useEffect(() => {
     writeAutoScan(autoScan);
@@ -1274,6 +1287,11 @@ export default function App() {
       case 'settings_cycle_device_mode':
         switchDeviceMode(current => current === 'clickWheel' ? 'nano6Touch' : 'clickWheel');
         break;
+      case 'settings_set_device_mode':
+        if (node.settingKey === 'clickWheel' || node.settingKey === 'nano6Touch') {
+          switchDeviceMode(node.settingKey);
+        }
+        break;
       case 'settings_toggle_auto_scan':
         setAutoScan(!autoScan);
         break;
@@ -1482,7 +1500,7 @@ export default function App() {
         setAutoScan(true);
         setContinuationMode('library');
         setMainMenuEnabled({});
-        setBacklightTimer('1m');
+        setBacklightTimer(DEFAULT_BACKLIGHT_TIMER);
         setEqPreset('Off');
         await localMusic.setEqPreset('Off');
         setCompilationsEnabled(true);
@@ -1492,6 +1510,9 @@ export default function App() {
         setSleepTimer(DEFAULT_SLEEP_TIMER);
         setStopwatch(DEFAULT_STOPWATCH);
         writeContinuationMode('library');
+        writeString(BACKLIGHT_TIMER_KEY, DEFAULT_BACKLIGHT_TIMER);
+        writeUiSoundVolume(DEFAULT_UI_SOUND_VOLUME);
+        writeString(SETTINGS_DEFAULTS_VERSION_KEY, SETTINGS_DEFAULTS_VERSION);
         await setPlaybackMode('sequential');
         break;
       default:
