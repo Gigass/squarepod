@@ -1228,6 +1228,18 @@ export default function App() {
     closeTextEditor();
   };
 
+  const resetNavigationToRoot = () => {
+    setMainMenuReorderKey(undefined);
+    setMainMenuDraftOrder(undefined);
+    setUnlockArmed(false);
+    setStack([{ node: rootMenu, cursorIndex: 0 }]);
+  };
+
+  const switchDeviceMode = (nextMode: DeviceMode | ((current: DeviceMode) => DeviceMode)) => {
+    resetNavigationToRoot();
+    setDeviceMode(nextMode);
+  };
+
   const runAction = async (node: MenuNode) => {
     setLastInteractionAt(Date.now());
     switch (node.action) {
@@ -1260,9 +1272,7 @@ export default function App() {
         });
         break;
       case 'settings_cycle_device_mode':
-        setMainMenuReorderKey(undefined);
-        setMainMenuDraftOrder(undefined);
-        setDeviceMode(current => current === 'clickWheel' ? 'nano6Touch' : 'clickWheel');
+        switchDeviceMode(current => current === 'clickWheel' ? 'nano6Touch' : 'clickWheel');
         break;
       case 'settings_toggle_auto_scan':
         setAutoScan(!autoScan);
@@ -1477,7 +1487,7 @@ export default function App() {
         await localMusic.setEqPreset('Off');
         setCompilationsEnabled(true);
         setLanguage('en');
-        setDeviceMode('clickWheel');
+        switchDeviceMode('clickWheel');
         setNoteDraft(undefined);
         setSleepTimer(DEFAULT_SLEEP_TIMER);
         setStopwatch(DEFAULT_STOPWATCH);
