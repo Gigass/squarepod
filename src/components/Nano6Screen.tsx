@@ -25,6 +25,7 @@ interface Nano6ScreenProps {
   onTextEditorChange: (field: EditorFieldKey, value: string) => void;
   onTextEditorSave: () => void;
   onTextEditorCancel: () => void;
+  onVideoPlay: () => void;
   onEbookProgress: (ebookId: string, progress: number, chapterIndex?: number) => void;
   onBack: () => void;
   onHome: () => void;
@@ -108,6 +109,15 @@ const nanoTimeLabel = () => new Date().toLocaleTimeString('en-US', {
   hour: 'numeric',
   minute: '2-digit',
 });
+
+const readViewportSize = () => {
+  if (typeof window === 'undefined') return { width: 240, height: 240 };
+  const viewport = window.visualViewport;
+  const doc = document.documentElement;
+  const width = Math.max(1, Math.round(viewport?.width || window.innerWidth || doc.clientWidth || 240));
+  const height = Math.max(1, Math.round(viewport?.height || window.innerHeight || doc.clientHeight || 240));
+  return { width, height };
+};
 
 interface NanoBatteryState {
   percent?: number;
@@ -937,7 +947,7 @@ const resolveNanoImageSrc = (sourceUrl?: string) => {
   return sourceUrl;
 };
 
-function VideoDetailScreen({ node, locale }: { node: MenuNode; locale: Locale }) {
+function VideoDetailScreen({ node, locale, onVideoPlay }: { node: MenuNode; locale: Locale; onVideoPlay: Nano6ScreenProps['onVideoPlay'] }) {
   const item = node.mediaItem;
   const videoSrc = resolveNanoImageSrc(item?.uri);
   const posterSrc = resolveNanoImageSrc(item?.thumbnailUri);
@@ -983,6 +993,7 @@ function VideoDetailScreen({ node, locale }: { node: MenuNode; locale: Locale })
           preload="metadata"
           className="absolute inset-0 h-full w-full object-contain"
           onPlay={() => {
+            onVideoPlay();
             setVideoHasStarted(true);
             setVideoIsPaused(false);
           }}
@@ -1892,7 +1903,7 @@ function NowPlayingScreen({
     <div className="relative h-full overflow-hidden bg-[linear-gradient(180deg,#f6f3ea,#c9c5b8)] px-[10px] pt-[24px]">
       <StatusBar title={t(locale, 'nowPlaying')} isPlaying={isPlaying} />
       {currentSong ? (
-        <div className="relative h-full">
+        <div className="relative h-full pb-[72px]">
           <div className="relative mx-auto aspect-square w-[88px] shrink-0 overflow-hidden rounded-[3px] bg-neutral-300 shadow-[0_7px_13px_rgba(0,0,0,0.42)]">
             <CachedImage src={currentSong.coverUrl} className="absolute inset-0 h-full w-full object-cover" />
           </div>
@@ -1900,7 +1911,9 @@ function NowPlayingScreen({
             <div className="truncate text-[13px] font-black leading-tight">{currentSong.title}</div>
             <div className="mt-[2px] truncate text-[10px] font-bold text-neutral-700">{currentSong.artist}</div>
           </div>
-          <div className="mt-[3px] min-h-[12px] truncate text-center text-[9px] font-black leading-[12px] text-neutral-700">{lyric}</div>
+          <div className="mt-[4px] min-h-[20px] px-[8px] text-center text-[8px] font-black leading-[10px] text-neutral-700 line-clamp-2">
+            {lyric}
+          </div>
           <div className="absolute inset-x-0 bottom-[7px]">
             <div className="h-[6px] rounded-full bg-black/18 p-[1px]" onPointerDown={scrub}>
               <div className="h-full rounded-full bg-[#2b69c8]" style={{ width: `${percent}%` }} />
@@ -2317,20 +2330,28 @@ export function Nano6Screen(props: Nano6ScreenProps) {
   const startRef = React.useRef<TouchStart>();
   const longPressRef = React.useRef<number>();
   const lastTouchAtRef = React.useRef(0);
-  const [screenScale, setScreenScale] = React.useState(1);
+  const [viewportSize, setViewportSize] = React.useState(readViewportSize);
   const [battery, setBattery] = React.useState<NanoBatteryState>({ charging: false });
+  const screenSize = Math.min(viewportSize.width, viewportSize.height);
+  const screenScale = screenSize / 240;
 
   React.useEffect(() => {
     const updateScale = () => {
-      const viewport = window.visualViewport;
-      setScreenScale(Math.min(viewport?.width ?? window.innerWidth, viewport?.height ?? window.innerHeight) / 240);
+      setViewportSize(readViewportSize());
     };
+    const viewport = window.visualViewport;
+    const canListenToVisualViewport = Boolean(
+      viewport
+      && typeof viewport.addEventListener === 'function'
+      && typeof viewport.removeEventListener === 'function',
+    );
+
     updateScale();
     window.addEventListener('resize', updateScale);
-    window.visualViewport?.addEventListener('resize', updateScale);
+    if (canListenToVisualViewport) viewport.addEventListener('resize', updateScale);
     return () => {
       window.removeEventListener('resize', updateScale);
-      window.visualViewport?.removeEventListener('resize', updateScale);
+      if (canListenToVisualViewport) viewport.removeEventListener('resize', updateScale);
     };
   }, []);
 
@@ -2452,7 +2473,7 @@ export function Nano6Screen(props: Nano6ScreenProps) {
   ) : props.currentNode.type === 'photoDetail' ? (
     <PhotoDetailScreen node={props.currentNode} locale={props.locale} onBack={props.onBack} onSetWallpaper={props.onSetWallpaper} />
   ) : props.currentNode.type === 'videoDetail' ? (
-    <VideoDetailScreen node={props.currentNode} locale={props.locale} />
+    <VideoDetailScreen node={props.currentNode} locale={props.locale} onVideoPlay={props.onVideoPlay} />
   ) : props.currentNode.type === 'ebookReader' ? (
     <EbookReaderScreen node={props.currentNode} locale={props.locale} onEbookProgress={props.onEbookProgress} />
   ) : props.currentNode.type === 'clock' ? (
@@ -2476,10 +2497,14 @@ export function Nano6Screen(props: Nano6ScreenProps) {
 
   return (
     <NanoBatteryContext.Provider value={battery}>
-      <div className="h-[100dvh] w-[100dvw] overflow-hidden bg-black font-sans">
-        <div className="mx-auto grid h-full w-full place-items-center">
+      <div
+        className="overflow-hidden bg-black font-sans"
+        style={{ width: viewportSize.width, height: viewportSize.height }}
+      >
+        <div className="grid h-full w-full place-items-center">
           <div
-            className={`relative aspect-square w-[min(100dvw,100dvh)] touch-manipulation select-none overflow-hidden bg-black transition-opacity duration-300 ${props.screenDimmed ? 'opacity-35' : 'opacity-100'}`}
+            className={`relative touch-manipulation select-none overflow-hidden bg-black transition-opacity duration-300 ${props.screenDimmed ? 'opacity-35' : 'opacity-100'}`}
+            style={{ width: screenSize, height: screenSize }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}

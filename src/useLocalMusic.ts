@@ -213,6 +213,12 @@ export function useLocalMusic({ autoScan = true }: UseLocalMusicOptions = {}) {
     });
   };
 
+  const pausePlayback = async () => {
+    const state = await LocalMusic.pause();
+    applyPlaybackState(state);
+    return state;
+  };
+
   const nextTrack = () => {
     LocalMusic.next().then(applyPlaybackState).catch(error => {
       setStatus('error');
@@ -276,6 +282,7 @@ export function useLocalMusic({ autoScan = true }: UseLocalMusicOptions = {}) {
     scanLibrary,
     playQueue,
     playPause,
+    pausePlayback,
     nextTrack,
     prevTrack,
     seekTo,

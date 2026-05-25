@@ -447,6 +447,7 @@ export default function App() {
     progress,
     playbackMode,
     playPause,
+    pausePlayback,
     nextTrack,
     prevTrack,
     seekTo,
@@ -2040,6 +2041,13 @@ export default function App() {
     });
   };
 
+  const handleVideoPlay = () => {
+    if (!isPlaying) return;
+    pausePlayback().catch(error => {
+      console.error('Pause before video playback failed', error);
+    });
+  };
+
   const handleSetNano6Wallpaper = (url: string) => {
     setLastInteractionAt(Date.now());
     setNano6Wallpaper(url);
@@ -2082,6 +2090,7 @@ export default function App() {
           onTextEditorChange={updateTextEditorField}
           onTextEditorSave={saveTextEditor}
           onTextEditorCancel={closeTextEditor}
+          onVideoPlay={handleVideoPlay}
           onEbookProgress={updateEbookProgress}
           onBack={handleMenu}
           onHome={handleTouchHome}
@@ -2143,6 +2152,7 @@ export default function App() {
             onTextEditorChange={updateTextEditorField}
             onTextEditorSave={saveTextEditor}
             onTextEditorCancel={closeTextEditor}
+            onVideoPlay={handleVideoPlay}
             onEbookProgress={updateEbookProgress}
             onCoverFlowSettleTarget={setCoverFlowCursorIndex}
             alphaJumpKey={alphaJumpKey}

@@ -45,6 +45,7 @@ interface ScreenProps {
   onTextEditorChange: (field: keyof TextEditorState['fields'], value: string) => void;
   onTextEditorSave: () => void;
   onTextEditorCancel: () => void;
+  onVideoPlay: () => void;
   onEbookProgress: (ebookId: string, progress: number, chapterIndex?: number) => void;
   onCoverFlowSettleTarget: (index: number) => void;
   alphaJumpKey?: string;
@@ -288,6 +289,7 @@ export function Screen({
   onTextEditorChange,
   onTextEditorSave,
   onTextEditorCancel,
+  onVideoPlay,
   onEbookProgress,
   onCoverFlowSettleTarget,
   alphaJumpKey,
@@ -541,7 +543,7 @@ export function Screen({
       return (
         <motion.div
           key={`${line.time}-${line.text}`}
-          className="mt-2 w-full min-h-[18px] px-1 text-center text-[10px] font-black leading-tight text-gray-700 line-clamp-2"
+          className="mt-2 w-full min-h-[20px] px-1 text-center text-[9px] font-black leading-[1.2] text-gray-700 line-clamp-2"
           initial={{ opacity: 0, y: 3 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.18, ease: 'easeOut' }}
@@ -552,17 +554,17 @@ export function Screen({
     }
 
     return (
-      <div className="mt-4 flex min-h-[76px] flex-col justify-center gap-1 overflow-hidden border-t border-gray-200 pt-3">
+      <div className="mt-4 flex min-h-[80px] flex-col justify-center gap-[2px] overflow-hidden border-t border-gray-200 pt-3">
         {visibleIndexes.map(index => {
           const line = lyrics[index];
           const isActive = index === focusIndex;
           return (
             <motion.div
               key={`${line.time}-${line.text}`}
-              className={`line-clamp-2 leading-tight ${
+              className={`line-clamp-2 leading-[1.2] ${
                 isActive
-                  ? 'text-[13px] font-black text-gray-950'
-                  : 'text-[10px] font-bold text-gray-400'
+                  ? 'text-[11px] font-black text-gray-950'
+                  : 'text-[9px] font-bold text-gray-400'
               }`}
               animate={{ opacity: isActive ? 1 : 0.52, y: 0 }}
               initial={{ opacity: 0, y: isActive ? 4 : 2 }}
@@ -615,8 +617,8 @@ export function Screen({
           </svg>
         )}
       </div>
-      <div className="text-[10px] leading-none font-bold text-gray-700 uppercase tracking-tighter truncate flex-1 text-center">
-        {currentNode.title}
+      <div className="flex h-full flex-1 items-center justify-center pt-[2px] text-center text-[10px] font-bold uppercase leading-none tracking-tighter text-gray-700">
+        <span className="truncate">{currentNode.title}</span>
       </div>
       <div className="flex items-center justify-end w-16 h-full gap-1 text-gray-700">
          {renderPlaybackModeIcon()}
@@ -1487,6 +1489,7 @@ export function Screen({
           preload="metadata"
           className="absolute inset-0 h-full w-full object-contain"
           onPlay={() => {
+            onVideoPlay();
             setVideoHasStarted(true);
             setVideoIsPaused(false);
           }}
