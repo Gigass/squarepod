@@ -202,6 +202,26 @@ SquarePod uses the SquarePod folders as the default Library Source so game and e
 Settings -> Library -> Library Source
 ```
 
+Library Source options:
+
+| Setting | What SquarePod scans | Where to put music |
+| --- | --- | --- |
+| `SquarePod` | `/sdcard/Music/SquarePod` and the app's external `Music` folder. This is the default. | Put user music in `/sdcard/Music/SquarePod`. |
+| `Android` | Android MediaStore audio library only. | Put music anywhere Android indexes as music, usually under `/sdcard/Music`. Game and emulator audio may also appear in this mode. |
+| `All` | SquarePod folders plus Android MediaStore. | Use only if you intentionally want both SquarePod-managed music and the full Android media library. |
+
+Do not use the app external folder as the normal manual import path:
+
+```text
+/sdcard/Android/data/com.squarepod.app/files/Music
+```
+
+Android file managers often hide or restrict `Android/data`. Use `/sdcard/Music/SquarePod` for music you manage yourself, then run:
+
+```text
+Music -> Scan
+```
+
 Supported scanner extensions:
 
 - `.mp3`
@@ -482,6 +502,26 @@ SquarePod 默认使用 SquarePod 文件夹作为资料库来源，避免游戏�
 
 ```text
 Settings -> Library -> Library Source
+```
+
+资料库来源选项：
+
+| 设置 | SquarePod 会扫描什么 | 音乐文件应该放哪里 |
+| --- | --- | --- |
+| `SquarePod` | `/sdcard/Music/SquarePod` 和应用外部 `Music` 文件夹。这是默认值。 | 把用户音乐放到 `/sdcard/Music/SquarePod`。 |
+| `Android` | 只扫描 Android MediaStore 音频库。 | 放到 Android 会索引为音乐的位置，通常是 `/sdcard/Music`。这个模式下游戏和模拟器音频也可能出现。 |
+| `All` | SquarePod 文件夹 + Android MediaStore。 | 只有在你明确想同时读取 SquarePod 管理音乐和完整 Android 媒体库时使用。 |
+
+不建议把应用外部目录作为日常手动导入路径：
+
+```text
+/sdcard/Android/data/com.squarepod.app/files/Music
+```
+
+Android 文件管理器经常隐藏或限制 `Android/data`。自己管理的音乐统一放到 `/sdcard/Music/SquarePod`，然后执行：
+
+```text
+Music -> Scan
 ```
 
 扫描支持的扩展名：
