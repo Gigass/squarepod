@@ -2172,7 +2172,7 @@ const generateSettingsMenu = (local: LocalMusicMenuState = {}): MenuNode => {
         type: 'about',
         previewIcon: <Info className="w-16 h-16" />,
         detailLines: [
-          'Version: V1.6',
+          'Version: V1.7',
           'Devices: Nano6 + Classic',
           `${t(locale, 'allSongs')}: ${trackCount}`,
           `${t(locale, 'artists')}: ${artistCount}`,
