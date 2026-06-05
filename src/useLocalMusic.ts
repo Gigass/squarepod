@@ -1,27 +1,80 @@
 import { Capacitor } from '@capacitor/core';
 import { useEffect, useMemo, useState } from 'react';
-import { LocalMusic, LocalMusicPlaybackState, LocalMusicTrack, LocalRepeatMode } from './native/localMusic';
+import { LocalMusic, LocalMusicPlaybackState, LocalMusicSourceMode, LocalMusicTrack, LocalMusicTrackSource, LocalRepeatMode } from './native/localMusic';
 import { PlaybackMode, ShuffleMode, Song } from './types';
 
 export type LocalMusicStatus = 'idle' | 'working' | 'ready' | 'needsPermission' | 'error' | 'success';
 
-const CACHE_KEY = 'squarepod.localMusicLibrary.v1';
+const CACHE_KEY = 'squarepod.localMusicLibrary.v2';
 const FALLBACK_COVER = 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&q=80&w=400';
 const WEB_PREVIEW_SEED_PATH = '/dev-local-music-seed.json';
 
-const readCachedTracks = () => {
-  if (typeof window === 'undefined') return [];
+interface LocalMusicCacheV2 {
+  version: 2;
+  sourceMode: LocalMusicSourceMode;
+  scannedAt: number;
+  musicDirectory: string;
+  publicMusicDirectory?: string;
+  tracks: LocalMusicTrack[];
+  sourceCounts?: Partial<Record<LocalMusicTrackSource, number>>;
+}
+
+const normalizeSourceMode = (value?: string): LocalMusicSourceMode => {
+  if (value === 'android' || value === 'all') return value;
+  return 'squarepod';
+};
+
+const sourceModeLabel = (mode: LocalMusicSourceMode) => {
+  if (mode === 'android') return 'Android media library';
+  if (mode === 'all') return 'SquarePod folders and Android media library';
+  return 'SquarePod folders';
+};
+
+const readCachedLibrary = (sourceMode: LocalMusicSourceMode): LocalMusicCacheV2 | undefined => {
+  if (typeof window === 'undefined') return undefined;
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(CACHE_KEY) || '[]') as LocalMusicTrack[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed = JSON.parse(window.localStorage.getItem(CACHE_KEY) || '') as Partial<LocalMusicCacheV2>;
+    if (
+      parsed?.version !== 2 ||
+      normalizeSourceMode(parsed.sourceMode) !== sourceMode ||
+      !Array.isArray(parsed.tracks)
+    ) {
+      return undefined;
+    }
+    return {
+      version: 2,
+      sourceMode,
+      scannedAt: Number(parsed.scannedAt) || 0,
+      musicDirectory: parsed.musicDirectory || '',
+      publicMusicDirectory: parsed.publicMusicDirectory,
+      tracks: parsed.tracks,
+      sourceCounts: parsed.sourceCounts,
+    };
   } catch {
-    return [];
+    return undefined;
   }
 };
 
-const writeCachedTracks = (tracks: LocalMusicTrack[]) => {
+const writeCachedLibrary = (
+  sourceMode: LocalMusicSourceMode,
+  library: {
+    tracks: LocalMusicTrack[];
+    musicDirectory?: string;
+    publicMusicDirectory?: string;
+    sourceCounts?: Partial<Record<LocalMusicTrackSource, number>>;
+  },
+) => {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(CACHE_KEY, JSON.stringify(tracks));
+  const cache: LocalMusicCacheV2 = {
+    version: 2,
+    sourceMode,
+    scannedAt: Date.now(),
+    musicDirectory: library.musicDirectory || '',
+    publicMusicDirectory: library.publicMusicDirectory,
+    tracks: library.tracks,
+    sourceCounts: library.sourceCounts,
+  };
+  window.localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
 };
 
 const isLocalPreviewHost = () => {
@@ -51,14 +104,19 @@ const playbackModeFromState = (shuffle: ShuffleMode, repeat: LocalRepeatMode): P
 
 interface UseLocalMusicOptions {
   autoScan?: boolean;
+  sourceMode?: LocalMusicSourceMode;
 }
 
-export function useLocalMusic({ autoScan = true }: UseLocalMusicOptions = {}) {
+export function useLocalMusic({ autoScan = true, sourceMode = 'squarepod' }: UseLocalMusicOptions = {}) {
   const isAndroid = Capacitor.getPlatform() === 'android';
+  const activeSourceMode = normalizeSourceMode(sourceMode);
+  const initialCache = () => readCachedLibrary(activeSourceMode);
   const [status, setStatus] = useState<LocalMusicStatus>('idle');
   const [message, setMessage] = useState('Scan local music to build your library.');
-  const [tracks, setTracks] = useState<LocalMusicTrack[]>(readCachedTracks);
+  const [tracks, setTracks] = useState<LocalMusicTrack[]>(() => initialCache()?.tracks || []);
   const [musicDirectory, setMusicDirectory] = useState('');
+  const [publicMusicDirectory, setPublicMusicDirectory] = useState('');
+  const [sourceCounts, setSourceCounts] = useState<Partial<Record<LocalMusicTrackSource, number>>>({});
   const [playbackState, setPlaybackState] = useState<LocalMusicPlaybackState>();
   const [shuffleMode, setShuffleModeState] = useState<ShuffleMode>('off');
   const [repeatMode, setRepeatModeState] = useState<LocalRepeatMode>('off');
@@ -72,18 +130,45 @@ export function useLocalMusic({ autoScan = true }: UseLocalMusicOptions = {}) {
   const playbackMode = playbackModeFromState(shuffleMode, repeatMode);
 
   useEffect(() => {
+    const cached = readCachedLibrary(activeSourceMode);
+    setTracks(cached?.tracks || []);
+    setMusicDirectory(cached?.musicDirectory || '');
+    setPublicMusicDirectory(cached?.publicMusicDirectory || '');
+    setSourceCounts(cached?.sourceCounts || {});
+    if (cached?.tracks.length) {
+      setStatus('success');
+      setMessage(`Loaded ${cached.tracks.length} cached local songs from ${sourceModeLabel(activeSourceMode)}.`);
+    } else if (!isPlaying) {
+      setStatus('idle');
+      setMessage(`Scan ${sourceModeLabel(activeSourceMode)} to build your library.`);
+    }
+  }, [activeSourceMode, isPlaying]);
+
+  useEffect(() => {
     if (!isAndroid) {
       let cancelled = false;
-      const cachedTracks = readCachedTracks();
+      const cachedLibrary = readCachedLibrary(activeSourceMode);
 
-      const applySeedLibrary = (nextTracks: LocalMusicTrack[], nextDirectory = '') => {
+      const applySeedLibrary = (
+        nextTracks: LocalMusicTrack[],
+        nextDirectory = '',
+        nextPublicDirectory = '',
+        nextSourceCounts: Partial<Record<LocalMusicTrackSource, number>> = {},
+      ) => {
         if (cancelled) return;
         setTracks(nextTracks);
         setMusicDirectory(nextDirectory);
-        writeCachedTracks(nextTracks);
+        setPublicMusicDirectory(nextPublicDirectory);
+        setSourceCounts(nextSourceCounts);
+        writeCachedLibrary(activeSourceMode, {
+          tracks: nextTracks,
+          musicDirectory: nextDirectory,
+          publicMusicDirectory: nextPublicDirectory,
+          sourceCounts: nextSourceCounts,
+        });
         setStatus(nextTracks.length ? 'success' : 'error');
         setMessage(nextTracks.length
-          ? `Loaded ${nextTracks.length} local songs for web preview${nextDirectory ? ` from ${nextDirectory}` : ''}.`
+          ? `Loaded ${nextTracks.length} local songs for web preview from ${sourceModeLabel(activeSourceMode)}${nextDirectory ? ` (${nextDirectory})` : ''}.`
           : 'Local music playback is implemented in the Android app.');
       };
 
@@ -91,20 +176,40 @@ export function useLocalMusic({ autoScan = true }: UseLocalMusicOptions = {}) {
         fetch(WEB_PREVIEW_SEED_PATH, { cache: 'no-store' })
           .then(async response => {
             if (!response.ok) throw new Error(`Seed request failed: ${response.status}`);
-            const library = await response.json() as { tracks?: LocalMusicTrack[]; musicDirectory?: string };
-            applySeedLibrary(Array.isArray(library.tracks) ? library.tracks : [], library.musicDirectory || '');
+            const library = await response.json() as {
+              tracks?: LocalMusicTrack[];
+              musicDirectory?: string;
+              publicMusicDirectory?: string;
+              sourceCounts?: Partial<Record<LocalMusicTrackSource, number>>;
+            };
+            applySeedLibrary(
+              Array.isArray(library.tracks) ? library.tracks : [],
+              library.musicDirectory || '',
+              library.publicMusicDirectory || '',
+              library.sourceCounts || {},
+            );
           })
           .catch(() => {
-            if (cachedTracks.length) {
-              applySeedLibrary(cachedTracks);
+            if (cachedLibrary?.tracks.length) {
+              applySeedLibrary(
+                cachedLibrary.tracks,
+                cachedLibrary.musicDirectory,
+                cachedLibrary.publicMusicDirectory || '',
+                cachedLibrary.sourceCounts || {},
+              );
               return;
             }
             if (cancelled) return;
             setStatus('error');
             setMessage('Local music playback is implemented in the Android app.');
           });
-      } else if (cachedTracks.length) {
-        applySeedLibrary(cachedTracks);
+      } else if (cachedLibrary?.tracks.length) {
+        applySeedLibrary(
+          cachedLibrary.tracks,
+          cachedLibrary.musicDirectory,
+          cachedLibrary.publicMusicDirectory || '',
+          cachedLibrary.sourceCounts || {},
+        );
       } else {
         setStatus('error');
         setMessage('Local music playback is implemented in the Android app.');
@@ -143,7 +248,7 @@ export function useLocalMusic({ autoScan = true }: UseLocalMusicOptions = {}) {
       stateHandle?.remove();
       errorHandle?.remove();
     };
-  }, [isAndroid]);
+  }, [activeSourceMode, isAndroid]);
 
   useEffect(() => {
     if (!isPlaying) return undefined;
@@ -169,13 +274,16 @@ export function useLocalMusic({ autoScan = true }: UseLocalMusicOptions = {}) {
     setStatus('working');
     setMessage('Scanning local music...');
     try {
-      const library = await LocalMusic.scanLibrary();
+      const library = await LocalMusic.scanLibrary({ sourceMode: activeSourceMode });
+      const resolvedSourceMode = normalizeSourceMode(library.sourceMode || activeSourceMode);
       setTracks(library.tracks);
       setMusicDirectory(library.musicDirectory);
-      writeCachedTracks(library.tracks);
+      setPublicMusicDirectory(library.publicMusicDirectory || '');
+      setSourceCounts(library.sourceCounts || {});
+      writeCachedLibrary(resolvedSourceMode, library);
       setStatus('success');
       setMessage(library.tracks.length
-        ? `Scanned ${library.tracks.length} local songs.`
+        ? `Scanned ${library.tracks.length} local songs from ${sourceModeLabel(resolvedSourceMode)}.`
         : `No songs found. Add files to ${library.musicDirectory}`);
       return library;
     } catch (error) {
@@ -189,7 +297,7 @@ export function useLocalMusic({ autoScan = true }: UseLocalMusicOptions = {}) {
   useEffect(() => {
     if (!isAndroid || !autoScan) return;
     scanLibrary().catch(() => undefined);
-  }, [autoScan, isAndroid]);
+  }, [activeSourceMode, autoScan, isAndroid]);
 
   const playQueue = async (queue: LocalMusicTrack[], startIndex = 0, options: { shuffle?: boolean; repeatMode?: LocalRepeatMode } = {}) => {
     if (!queue.length) throw new Error('No local tracks to play.');
@@ -271,6 +379,9 @@ export function useLocalMusic({ autoScan = true }: UseLocalMusicOptions = {}) {
     message,
     tracks,
     musicDirectory,
+    publicMusicDirectory,
+    sourceMode: activeSourceMode,
+    sourceCounts,
     currentSong,
     currentTrack,
     playbackQueue,

@@ -3,6 +3,7 @@ export interface AppleMusicSong {
   title: string;
   artist: string;
   album: string;
+  albumArtist?: string;
   duration: number;
   artworkUrl?: string;
   catalogId?: string;
@@ -22,6 +23,7 @@ interface AppleMusicAttributes {
   name?: string;
   artistName?: string;
   albumName?: string;
+  albumArtistName?: string;
   durationInMillis?: number;
   description?: {
     standard?: string;
@@ -84,6 +86,7 @@ const mapSong = (resource: AppleMusicResource): AppleMusicSong => {
     title: attributes.name || 'Unknown Song',
     artist: attributes.artistName || 'Unknown Artist',
     album: attributes.albumName || 'Unknown Album',
+    albumArtist: attributes.albumArtistName,
     duration: Math.max(1, Math.round((attributes.durationInMillis || 0) / 1000)),
     artworkUrl: artworkUrl(attributes.artwork?.url),
     catalogId,

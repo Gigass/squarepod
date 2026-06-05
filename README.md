@@ -11,7 +11,7 @@ SquarePod is an Android-first local music player with two iPod-style interfaces:
 - **iPod classic mode:** a Click Wheel interface with Cover Flow, menus, haptics, and classic playback screens.
 - **iPod nano 6 mode:** a touch interface with a paged icon home screen, status bar, native-feeling media views, photo wallpaper support, and a rebuilt Cover Flow stack with stable depth ordering.
 
-The core product path is local Android media playback. SquarePod scans audio files already on the device, builds a local library, and plays them through Android's native media stack. It does not depend on Apple Music or Spotify for playback.
+The core product path is local Android media playback. SquarePod scans its own music folders by default, builds a local library, and plays them through Android's native media stack. Android MediaStore scanning remains available as an explicit Library Source setting. It does not depend on Apple Music or Spotify for playback.
 
 ### Current Build
 
@@ -29,7 +29,7 @@ The core product path is local Android media playback. SquarePod scans audio fil
 ### Features
 
 - Two device modes: Click Wheel classic and iPod nano 6 touch.
-- Android local music scanning from MediaStore and SquarePod music folders.
+- Android local music scanning from SquarePod music folders by default, with optional Android MediaStore scanning.
 - Offline playback for local audio files.
 - Same-name `.lrc` lyric parsing and synced lyric display.
 - Cover Flow grouped by local albums.
@@ -196,6 +196,12 @@ Then open SquarePod:
 Music -> Scan
 ```
 
+SquarePod uses the SquarePod folders as the default Library Source so game and emulator audio assets do not enter the music library on handheld devices. To scan the full Android media library instead, use:
+
+```text
+Settings -> Library -> Library Source
+```
+
 Supported scanner extensions:
 
 - `.mp3`
@@ -287,7 +293,7 @@ SquarePod 是一个 Android-first 的本地音乐播放器，提供两种 iPod �
 - **iPod classic 模式：** Click Wheel 操作、Cover Flow、菜单、震动反馈和经典播放界面。
 - **iPod nano 6 模式：** 触摸界面、分页图标主屏、状态栏、媒体浏览界面、照片墙纸，以及重做后的稳定层级 Cover Flow 动画。
 
-核心路径是 Android 本地媒体播放。SquarePod 扫描设备上的本地音频文件，构建本地资料库，并通过 Android 原生媒体能力播放。它不依赖 Apple Music 或 Spotify 播放音乐。
+核心路径是 Android 本地媒体播放。SquarePod 默认只扫描自己的音乐文件夹，构建本地资料库，并通过 Android 原生媒体能力播放。Android MediaStore 扫描保留为显式的资料库来源设置。它不依赖 Apple Music 或 Spotify 播放音乐。
 
 ### 当前版本
 
@@ -305,7 +311,7 @@ SquarePod 是一个 Android-first 的本地音乐播放器，提供两种 iPod �
 ### 功能
 
 - 两种设备模式：Click Wheel classic 和 iPod nano 6 touch。
-- 从 Android MediaStore 和 SquarePod 音乐文件夹扫描本地音乐。
+- 默认从 SquarePod 音乐文件夹扫描本地音乐，可选扫描 Android MediaStore。
 - 离线播放本地音频文件。
 - 同名 `.lrc` 歌词解析和同步歌词显示。
 - 按本地专辑分组的 Cover Flow。
@@ -470,6 +476,12 @@ adb push "/path/to/music-or-folder" /sdcard/Music/SquarePod/
 
 ```text
 Music -> Scan
+```
+
+SquarePod 默认使用 SquarePod 文件夹作为资料库来源，避免游戏掌机上的游戏和模拟器音频资源进入音乐库。如需扫描完整 Android 媒体库，进入：
+
+```text
+Settings -> Library -> Library Source
 ```
 
 扫描支持的扩展名：

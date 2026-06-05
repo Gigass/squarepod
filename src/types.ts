@@ -39,6 +39,7 @@ export type MenuAction =
   | 'settings_cycle_device_mode'
   | 'settings_set_device_mode'
   | 'settings_toggle_auto_scan'
+  | 'settings_cycle_library_source'
   | 'settings_cycle_playback_mode'
   | 'settings_reset'
   | 'media_scan'

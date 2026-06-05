@@ -53,6 +53,12 @@ import org.json.JSONObject;
 public class LocalMusicPlugin extends Plugin {
     private static final String PLAYBACK_PREFS = "squarepod_local_playback";
     private static final String PLAYBACK_STATE_KEY = "state";
+    private static final String SOURCE_MODE_SQUAREPOD = "squarepod";
+    private static final String SOURCE_MODE_ANDROID = "android";
+    private static final String SOURCE_MODE_ALL = "all";
+    private static final String SOURCE_APP_FOLDER = "appFolder";
+    private static final String SOURCE_PUBLIC_SQUAREPOD = "publicSquarePod";
+    private static final String SOURCE_MEDIA_STORE = "mediaStore";
     private static final long PERSIST_INTERVAL_MS = 5000;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<LocalTrack> queue = new ArrayList<>();
@@ -86,7 +92,7 @@ public class LocalMusicPlugin extends Plugin {
             requestPermissionForAlias(permissionAlias(), call, "scanLibraryPermissionCallback");
             return;
         }
-        call.resolve(scanPayload());
+        call.resolve(scanPayload(call.getString("sourceMode", SOURCE_MODE_SQUAREPOD)));
     }
 
     @PermissionCallback
@@ -95,7 +101,7 @@ public class LocalMusicPlugin extends Plugin {
             call.reject("Audio library permission denied.");
             return;
         }
-        call.resolve(scanPayload());
+        call.resolve(scanPayload(call.getString("sourceMode", SOURCE_MODE_SQUAREPOD)));
     }
 
     @PluginMethod
@@ -232,13 +238,31 @@ public class LocalMusicPlugin extends Plugin {
         super.handleOnDestroy();
     }
 
-    private JSObject scanPayload() {
+    private JSObject scanPayload(String sourceMode) {
+        String normalizedSourceMode = normalizeSourceMode(sourceMode);
         List<LocalTrack> tracks = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         Set<String> seenPaths = new HashSet<>();
-        tracks.addAll(scanMediaStore(seen, seenPaths));
-        tracks.addAll(scanAppMusicDirectory(seen, seenPaths));
-        tracks.addAll(scanPublicSquarePodDirectory(seen, seenPaths));
+        int appFolderCount = 0;
+        int publicSquarePodCount = 0;
+        int mediaStoreCount = 0;
+
+        if (SOURCE_MODE_SQUAREPOD.equals(normalizedSourceMode) || SOURCE_MODE_ALL.equals(normalizedSourceMode)) {
+            List<LocalTrack> appFolderTracks = scanAppMusicDirectory(seen, seenPaths);
+            appFolderCount = appFolderTracks.size();
+            tracks.addAll(appFolderTracks);
+
+            List<LocalTrack> publicSquarePodTracks = scanPublicSquarePodDirectory(seen, seenPaths);
+            publicSquarePodCount = publicSquarePodTracks.size();
+            tracks.addAll(publicSquarePodTracks);
+        }
+
+        if (SOURCE_MODE_ANDROID.equals(normalizedSourceMode) || SOURCE_MODE_ALL.equals(normalizedSourceMode)) {
+            List<LocalTrack> mediaStoreTracks = scanMediaStore(seen, seenPaths);
+            mediaStoreCount = mediaStoreTracks.size();
+            tracks.addAll(mediaStoreTracks);
+        }
+
         Collections.sort(tracks, Comparator
             .comparing((LocalTrack track) -> safe(track.artist).toLowerCase(Locale.ROOT))
             .thenComparing(track -> safe(track.album).toLowerCase(Locale.ROOT))
@@ -253,6 +277,13 @@ public class LocalMusicPlugin extends Plugin {
         JSObject payload = new JSObject();
         payload.put("tracks", trackArray);
         payload.put("musicDirectory", appMusicDirectory().getAbsolutePath());
+        payload.put("publicMusicDirectory", publicSquarePodDirectory().getAbsolutePath());
+        payload.put("sourceMode", normalizedSourceMode);
+        JSObject sourceCounts = new JSObject();
+        sourceCounts.put(SOURCE_APP_FOLDER, appFolderCount);
+        sourceCounts.put(SOURCE_PUBLIC_SQUAREPOD, publicSquarePodCount);
+        sourceCounts.put(SOURCE_MEDIA_STORE, mediaStoreCount);
+        payload.put("sourceCounts", sourceCounts);
         return payload;
     }
 
@@ -296,6 +327,8 @@ public class LocalMusicPlugin extends Plugin {
                 if (!TextUtils.isEmpty(path)) seenPaths.add(path);
                 long albumId = cursor.getLong(albumIdIndex);
                 String trackId = "mediastore_" + id;
+                String albumIdKey = albumId > 0 ? "mediastore_album_" + albumId : null;
+                String albumArtist = readAlbumArtist(path);
                 String artworkUri = null;
                 if (!TextUtils.isEmpty(path)) {
                     artworkUri = extractEmbeddedArtwork(path, trackId);
@@ -309,11 +342,15 @@ public class LocalMusicPlugin extends Plugin {
                     safeTitle(cursor.getString(titleIndex), uriString),
                     safeArtist(cursor.getString(artistIndex)),
                     safeAlbum(cursor.getString(albumIndex)),
+                    albumArtist,
+                    albumIdKey,
                     readGenre(path),
                     Math.max(1, Math.round(cursor.getLong(durationIndex) / 1000f)),
                     Math.max(0, cursor.getInt(trackIndex) % 1000),
                     artworkUri,
-                    readSidecarLyrics(path)
+                    readSidecarLyrics(path),
+                    SOURCE_MEDIA_STORE,
+                    path
                 ));
             }
         } catch (Throwable ignored) {
@@ -326,20 +363,19 @@ public class LocalMusicPlugin extends Plugin {
         List<LocalTrack> tracks = new ArrayList<>();
         File directory = appMusicDirectory();
         if (!directory.exists()) directory.mkdirs();
-        scanFilesRecursive(directory, seen, seenPaths, tracks);
+        scanFilesRecursive(directory, seen, seenPaths, tracks, SOURCE_APP_FOLDER);
         return tracks;
     }
 
     private List<LocalTrack> scanPublicSquarePodDirectory(Set<String> seen, Set<String> seenPaths) {
         List<LocalTrack> tracks = new ArrayList<>();
-        File musicRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC);
-        File directory = new File(musicRoot, "SquarePod");
+        File directory = publicSquarePodDirectory();
         if (!directory.exists()) return tracks;
-        scanFilesRecursive(directory, seen, seenPaths, tracks);
+        scanFilesRecursive(directory, seen, seenPaths, tracks, SOURCE_PUBLIC_SQUAREPOD);
         return tracks;
     }
 
-    private void scanFilesRecursive(File directory, Set<String> seen, Set<String> seenPaths, List<LocalTrack> tracks) {
+    private void scanFilesRecursive(File directory, Set<String> seen, Set<String> seenPaths, List<LocalTrack> tracks, String source) {
         File[] files = directory.listFiles(new FileFilter() {
             @Override
             public boolean accept(File file) {
@@ -350,7 +386,7 @@ public class LocalMusicPlugin extends Plugin {
 
         for (File file : files) {
             if (file.isDirectory()) {
-                scanFilesRecursive(file, seen, seenPaths, tracks);
+                scanFilesRecursive(file, seen, seenPaths, tracks, source);
                 continue;
             }
             String path = file.getAbsolutePath();
@@ -358,17 +394,18 @@ public class LocalMusicPlugin extends Plugin {
             Uri uri = Uri.fromFile(file);
             String uriString = uri.toString();
             if (!seen.add(uriString)) continue;
-            tracks.add(trackFromFile(file, uriString));
+            tracks.add(trackFromFile(file, uriString, source));
         }
     }
 
-    private LocalTrack trackFromFile(File file, String uriString) {
+    private LocalTrack trackFromFile(File file, String uriString, String source) {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         try {
             retriever.setDataSource(file.getAbsolutePath());
             String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
             String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
             String album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM);
+            String albumArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST);
             String genre = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE);
             String duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
             String trackNumber = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER);
@@ -379,11 +416,15 @@ public class LocalMusicPlugin extends Plugin {
                 safeTitle(title, file.getName()),
                 safeArtist(artist),
                 safeAlbum(album),
+                safeOptionalMetadata(albumArtist),
+                null,
                 safeGenre(genre),
                 parseDuration(duration),
                 parseTrackNumber(trackNumber),
                 writeArtwork(retriever.getEmbeddedPicture(), trackId),
-                readSidecarLyrics(file)
+                readSidecarLyrics(file),
+                source,
+                file.getAbsolutePath()
             );
         } catch (Throwable ignored) {
             return new LocalTrack(
@@ -392,11 +433,15 @@ public class LocalMusicPlugin extends Plugin {
                 safeTitle(null, file.getName()),
                 "Unknown Artist",
                 "Unknown Album",
+                null,
+                null,
                 "Unknown Genre",
                 1,
                 0,
                 null,
-                readSidecarLyrics(file)
+                readSidecarLyrics(file),
+                source,
+                file.getAbsolutePath()
             );
         } finally {
             try {
@@ -413,6 +458,21 @@ public class LocalMusicPlugin extends Plugin {
             return safeGenre(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE));
         } catch (Throwable ignored) {
             return "Unknown Genre";
+        } finally {
+            try {
+                retriever.release();
+            } catch (IOException ignored) {}
+        }
+    }
+
+    private String readAlbumArtist(String path) {
+        if (TextUtils.isEmpty(path)) return null;
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(path);
+            return safeOptionalMetadata(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST));
+        } catch (Throwable ignored) {
+            return null;
         } finally {
             try {
                 retriever.release();
@@ -758,6 +818,17 @@ public class LocalMusicPlugin extends Plugin {
         return new File(base, "Music");
     }
 
+    private File publicSquarePodDirectory() {
+        File musicRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC);
+        return new File(musicRoot, "SquarePod");
+    }
+
+    private String normalizeSourceMode(String value) {
+        if (SOURCE_MODE_ANDROID.equals(value)) return SOURCE_MODE_ANDROID;
+        if (SOURCE_MODE_ALL.equals(value)) return SOURCE_MODE_ALL;
+        return SOURCE_MODE_SQUAREPOD;
+    }
+
     private String extractEmbeddedArtwork(String path, String trackId) {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         try {
@@ -976,6 +1047,11 @@ public class LocalMusicPlugin extends Plugin {
         return TextUtils.isEmpty(value) || "<unknown>".equals(value) ? "Unknown Genre" : value;
     }
 
+    private static String safeOptionalMetadata(String value) {
+        String trimmed = value == null ? "" : value.trim();
+        return TextUtils.isEmpty(trimmed) || "<unknown>".equals(trimmed) ? null : trimmed;
+    }
+
     private static String rootMessage(Throwable error) {
         Throwable root = error;
         while (root != null && root.getCause() != null) {
@@ -1000,23 +1076,31 @@ public class LocalMusicPlugin extends Plugin {
         final String title;
         final String artist;
         final String album;
+        final String albumArtist;
+        final String albumId;
         final String genre;
         final int duration;
         final int trackNumber;
         final String artworkUri;
         final List<LyricLine> lyrics;
+        final String source;
+        final String sourcePath;
 
-        LocalTrack(String id, String uri, String title, String artist, String album, String genre, int duration, int trackNumber, String artworkUri, List<LyricLine> lyrics) {
+        LocalTrack(String id, String uri, String title, String artist, String album, String albumArtist, String albumId, String genre, int duration, int trackNumber, String artworkUri, List<LyricLine> lyrics, String source, String sourcePath) {
             this.id = id;
             this.uri = uri;
             this.title = title;
             this.artist = artist;
             this.album = album;
+            this.albumArtist = albumArtist;
+            this.albumId = albumId;
             this.genre = genre;
             this.duration = duration;
             this.trackNumber = trackNumber;
             this.artworkUri = artworkUri;
             this.lyrics = lyrics == null ? Collections.emptyList() : lyrics;
+            this.source = source;
+            this.sourcePath = sourcePath;
         }
 
         JSObject toJS() {
@@ -1026,10 +1110,14 @@ public class LocalMusicPlugin extends Plugin {
             object.put("title", title);
             object.put("artist", artist);
             object.put("album", album);
+            if (albumArtist != null) object.put("albumArtist", albumArtist);
+            if (albumId != null) object.put("albumId", albumId);
             object.put("genre", genre);
             object.put("duration", duration);
             object.put("trackNumber", trackNumber);
             if (artworkUri != null) object.put("artworkUri", artworkUri);
+            if (source != null) object.put("source", source);
+            if (sourcePath != null) object.put("sourcePath", sourcePath);
             if (!lyrics.isEmpty()) {
                 JSArray lyricArray = new JSArray();
                 for (LyricLine line : lyrics) {
@@ -1050,11 +1138,15 @@ public class LocalMusicPlugin extends Plugin {
                 object.getString("title", "Unknown Track"),
                 object.getString("artist", "Unknown Artist"),
                 object.getString("album", "Unknown Album"),
+                object.getString("albumArtist"),
+                object.getString("albumId"),
                 object.getString("genre", "Unknown Genre"),
                 object.getInteger("duration", 1),
                 object.getInteger("trackNumber", 0),
                 object.getString("artworkUri"),
-                lyricsFromJS(object)
+                lyricsFromJS(object),
+                object.getString("source"),
+                object.getString("sourcePath")
             );
         }
 

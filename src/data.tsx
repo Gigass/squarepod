@@ -1,7 +1,7 @@
 import { DeviceMode, Song, MenuNode, PlaybackMode, SleepTimerEndAction } from './types';
 import React from 'react';
 import { Activity, BookOpen, Mic, PlayCircle, Film, Image as ImageIcon, Radio as RadioIcon, Settings, Shuffle, Clock, FileText, Calendar, Info, Volume2, RefreshCw, RotateCcw } from 'lucide-react';
-import { LocalMusicTrack } from './native/localMusic';
+import { LocalMusicSourceMode, LocalMusicTrack, LocalMusicTrackSource } from './native/localMusic';
 import { MediaLibraryItem } from './native/mediaLibrary';
 import { VoiceMemoItem } from './native/voiceMemos';
 import { RadioStation, RadioStatus } from './native/radio';
@@ -114,6 +114,9 @@ export interface LocalMusicMenuState {
   message?: string;
   tracks?: LocalMusicTrack[];
   musicDirectory?: string;
+  publicMusicDirectory?: string;
+  sourceMode?: LocalMusicSourceMode;
+  sourceCounts?: Partial<Record<LocalMusicTrackSource, number>>;
   currentTrack?: LocalMusicTrack;
   continuationMode?: 'album' | 'library';
   isScanning?: boolean;
@@ -320,16 +323,43 @@ const appleSongToMenuNode = (song: AppleMusicSong, source: 'catalog' | 'library'
   ],
 });
 
-const normalizeAlbumKey = (song: AppleMusicSong) => (
-  `${song.album.trim().toLowerCase()}|${song.artist.trim().toLowerCase()}`
+const normalizedKeyText = (value: string | undefined, fallback: string) => (
+  (value || fallback).trim().toLowerCase()
 );
 
-const safeNodeId = (value: string) => value
-  .trim()
-  .toLowerCase()
-  .replace(/[^a-z0-9]+/g, '_')
-  .replace(/^_+|_+$/g, '')
-  || 'unknown';
+const knownAlbumArtistKey = (value: string | undefined) => {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || normalized === '<unknown>' || normalized === 'unknown artist' || normalized === 'unknown album artist') return undefined;
+  return normalized;
+};
+
+const uniqueDisplayValues = (values: Array<string | undefined>) => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  values.forEach(value => {
+    const trimmed = value?.trim();
+    const key = knownAlbumArtistKey(trimmed);
+    if (!trimmed || !key || seen.has(key)) return;
+    seen.add(key);
+    result.push(trimmed);
+  });
+
+  return result;
+};
+
+const normalizeAlbumKey = (song: AppleMusicSong) => {
+  const album = normalizedKeyText(song.album, 'Unknown Album');
+  const albumArtist = knownAlbumArtistKey(song.albumArtist);
+  return albumArtist ? `${album}|albumartist:${albumArtist}` : `album:${album}`;
+};
+
+const appleAlbumArtistLabel = (songs: AppleMusicSong[]) => {
+  const albumArtists = uniqueDisplayValues(songs.map(song => song.albumArtist));
+  if (albumArtists.length === 1) return albumArtists[0];
+  const artists = uniqueDisplayValues(songs.map(song => song.artist));
+  return artists.length === 1 ? artists[0] : 'Various Artists';
+};
 
 const stableHash = (value: string) => {
   let hash = 2166136261;
@@ -342,9 +372,43 @@ const stableHash = (value: string) => {
 
 const stableNodeId = (prefix: string, value: string) => `${prefix}_${stableHash(value || 'unknown')}`;
 
-const normalizeLocalAlbumKey = (track: LocalMusicTrack) => (
-  `${(track.album || 'Unknown Album').trim().toLowerCase()}|${(track.artist || 'Unknown Artist').trim().toLowerCase()}`
+const normalizeLocalSourceMode = (mode?: LocalMusicSourceMode): LocalMusicSourceMode => (
+  mode === 'android' || mode === 'all' ? mode : 'squarepod'
 );
+
+const librarySourceLabel = (mode: LocalMusicSourceMode | undefined, locale: Locale = 'en') => {
+  switch (normalizeLocalSourceMode(mode)) {
+    case 'android':
+      return tx(locale, 'Android', 'Android');
+    case 'all':
+      return tx(locale, 'All', '全部');
+    case 'squarepod':
+    default:
+      return 'SquarePod';
+  }
+};
+
+const librarySourceDetail = (mode: LocalMusicSourceMode | undefined, locale: Locale = 'en') => {
+  switch (normalizeLocalSourceMode(mode)) {
+    case 'android':
+      return tx(locale, 'Android media library only.', '仅 Android 媒体库。');
+    case 'all':
+      return tx(locale, 'SquarePod folders and Android media library.', 'SquarePod 文件夹和 Android 媒体库。');
+    case 'squarepod':
+    default:
+      return tx(locale, 'SquarePod folders only.', '仅 SquarePod 音乐文件夹。');
+  }
+};
+
+const normalizeLocalAlbumKey = (track: LocalMusicTrack, compilationsEnabled = true) => {
+  const album = normalizedKeyText(track.album, 'Unknown Album');
+  const albumArtist = knownAlbumArtistKey(track.albumArtist);
+
+  if (track.albumId?.trim()) return `id:${track.albumId.trim().toLowerCase()}`;
+  if (albumArtist) return `${album}|albumartist:${albumArtist}`;
+  if (compilationsEnabled) return `album:${album}`;
+  return `${album}|artist:${normalizedKeyText(track.artist, 'Unknown Artist')}`;
+};
 
 const localTrackToMenuNode = (track: LocalMusicTrack, locale: Locale = 'en'): MenuNode => ({
   id: stableNodeId('local_track', track.id || track.uri || `${track.title}|${track.artist}|${track.album}`),
@@ -369,11 +433,27 @@ const sortLocalTracks = (tracks: LocalMusicTrack[]) => [...tracks].sort((left, r
   return (left.title || '').localeCompare(right.title || '', undefined, { sensitivity: 'base' });
 });
 
-const generateLocalCoverFlowNode = (tracks: LocalMusicTrack[], locale: Locale): MenuNode => {
+const sortLocalAlbumTracks = (tracks: LocalMusicTrack[]) => [...tracks].sort((left, right) => {
+  const leftTrack = left.trackNumber || Number.MAX_SAFE_INTEGER;
+  const rightTrack = right.trackNumber || Number.MAX_SAFE_INTEGER;
+  const trackSort = leftTrack - rightTrack;
+  if (trackSort) return trackSort;
+  return (left.title || '').localeCompare(right.title || '', undefined, { sensitivity: 'base' });
+});
+
+const localAlbumArtistLabel = (tracks: LocalMusicTrack[], locale: Locale) => {
+  const albumArtists = uniqueDisplayValues(tracks.map(track => track.albumArtist));
+  if (albumArtists.length === 1) return albumArtists[0];
+  const artists = uniqueDisplayValues(tracks.map(track => track.artist));
+  if (artists.length === 1) return artists[0];
+  return tx(locale, 'Various Artists', '群星');
+};
+
+const generateLocalCoverFlowNode = (tracks: LocalMusicTrack[], locale: Locale, compilationsEnabled = true): MenuNode => {
   const albumMap = new Map<string, LocalMusicTrack[]>();
 
   sortLocalTracks(tracks).forEach(track => {
-    const key = normalizeLocalAlbumKey(track);
+    const key = normalizeLocalAlbumKey(track, compilationsEnabled);
     const albumTracks = albumMap.get(key) || [];
     albumTracks.push(track);
     albumMap.set(key, albumTracks);
@@ -385,8 +465,9 @@ const generateLocalCoverFlowNode = (tracks: LocalMusicTrack[], locale: Locale): 
       return albumSort || (left[0].artist || '').localeCompare(right[0].artist || '', undefined, { sensitivity: 'base' });
     })
     .map(([key, albumTracks], index): MenuNode => {
-      const firstTrack = albumTracks[0];
-      const artworkTrack = albumTracks.find(track => Boolean(track.artworkUri)) || firstTrack;
+      const sortedAlbumTracks = sortLocalAlbumTracks(albumTracks);
+      const firstTrack = sortedAlbumTracks[0];
+      const artworkTrack = sortedAlbumTracks.find(track => Boolean(track.artworkUri)) || firstTrack;
 
       return {
         id: stableNodeId('cover_album', key || String(index)),
@@ -395,10 +476,10 @@ const generateLocalCoverFlowNode = (tracks: LocalMusicTrack[], locale: Locale): 
         previewImage: artworkTrack.artworkUri,
         localAlbumKey: key,
         detailLines: [
-          firstTrack.artist || unknownArtist(locale),
-          countText(locale, albumTracks.length, 'song', 'songs', '首歌曲'),
+          localAlbumArtistLabel(sortedAlbumTracks, locale),
+          countText(locale, sortedAlbumTracks.length, 'song', 'songs', '首歌曲'),
         ],
-        children: albumTracks.map(track => localTrackToMenuNode(track, locale)),
+        children: sortedAlbumTracks.map(track => localTrackToMenuNode(track, locale)),
       };
     });
 
@@ -419,6 +500,7 @@ const groupLocalTracks = (
   getKey: (track: LocalMusicTrack) => string,
   getTitle: (track: LocalMusicTrack) => string,
   locale: Locale,
+  sortGroupTracks: (tracks: LocalMusicTrack[]) => LocalMusicTrack[] = sortLocalTracks,
 ): MenuNode[] => {
   const groups = new Map<string, LocalMusicTrack[]>();
 
@@ -431,19 +513,23 @@ const groupLocalTracks = (
 
   return [...groups.entries()]
     .sort(([left], [right]) => left.localeCompare(right, undefined, { sensitivity: 'base' }))
-    .map(([key, groupTracks]) => ({
-      id: stableNodeId(idPrefix, key),
-      title: getTitle(groupTracks[0]),
-      type: 'menu',
-      previewImage: groupTracks.find(track => Boolean(track.artworkUri))?.artworkUri,
-      detailLines: [countText(locale, groupTracks.length, 'song', 'songs', '首歌曲')],
-      children: groupTracks.map(track => localTrackToMenuNode(track, locale)),
-    }));
+    .map(([key, groupTracks]) => {
+      const sortedGroupTracks = sortGroupTracks(groupTracks);
+      return {
+        id: stableNodeId(idPrefix, key),
+        title: getTitle(sortedGroupTracks[0]),
+        type: 'menu',
+        previewImage: sortedGroupTracks.find(track => Boolean(track.artworkUri))?.artworkUri,
+        detailLines: [countText(locale, sortedGroupTracks.length, 'song', 'songs', '首歌曲')],
+        children: sortedGroupTracks.map(track => localTrackToMenuNode(track, locale)),
+      };
+    });
 };
 
 const generateLocalMusicChildren = (state: LocalMusicMenuState = {}): MenuNode[] => {
   const locale = normalizeLocale(state.language);
   const tracks = sortLocalTracks(state.tracks || []);
+  const compilationsEnabled = state.compilationsEnabled !== false;
   const alphaSongs = buildAlphaIndexedList(tracks, track => track.title || t(locale, 'title'));
   const artistNodes = tracks.length
     ? groupLocalTracks(
@@ -459,9 +545,10 @@ const generateLocalMusicChildren = (state: LocalMusicMenuState = {}): MenuNode[]
     ? groupLocalTracks(
         tracks,
         'local_album',
-        track => normalizeLocalAlbumKey(track),
+        track => normalizeLocalAlbumKey(track, compilationsEnabled),
         track => track.album || unknownAlbum(locale),
         locale,
+        sortLocalAlbumTracks,
       )
     : [];
   const alphaAlbums = buildAlphaIndexedList(albumNodes, node => node.title);
@@ -479,14 +566,14 @@ const generateLocalMusicChildren = (state: LocalMusicMenuState = {}): MenuNode[]
         t(locale, 'selectSwitchesPlaybackMode'),
       ],
     },
-    generateLocalCoverFlowNode(tracks, locale),
+    generateLocalCoverFlowNode(tracks, locale, compilationsEnabled),
     {
       id: 'local_all_songs',
       title: t(locale, 'allSongs'),
       type: 'menu',
       detailLines: [
         countText(locale, tracks.length, 'local song', 'local songs', '首本地歌曲'),
-        tx(locale, 'Songs found on this Android device.', '此 Android 设备上的歌曲。'),
+        librarySourceDetail(state.sourceMode, locale),
       ],
       children: tracks.length
         ? alphaSongs.items.map(track => localTrackToMenuNode(track, locale))
@@ -539,7 +626,12 @@ const generateLocalMusicChildren = (state: LocalMusicMenuState = {}): MenuNode[]
       detailLines: [
         state.message || tx(locale, 'Scan local audio files.', '扫描本地音频文件。'),
         countText(locale, tracks.length, 'song cached', 'songs cached', '首歌曲已缓存'),
-        state.musicDirectory ? tx(locale, 'App folder: {path}', '应用文件夹：{path}', { path: state.musicDirectory }) : tx(locale, 'Reads Android audio library and app Music folder.', '读取 Android 音频库和应用 Music 文件夹。'),
+        tx(locale, 'Source: {source}', '来源：{source}', { source: librarySourceLabel(state.sourceMode, locale) }),
+        state.publicMusicDirectory
+          ? tx(locale, 'Music folder: {path}', '音乐文件夹：{path}', { path: state.publicMusicDirectory })
+          : state.musicDirectory
+            ? tx(locale, 'App folder: {path}', '应用文件夹：{path}', { path: state.musicDirectory })
+            : librarySourceDetail(state.sourceMode, locale),
       ],
     },
   ];
@@ -555,23 +647,22 @@ const generateCoverFlowNode = (songs: AppleMusicSong[]): MenuNode => {
     albumMap.set(key, albumSongs);
   });
 
-  const albums = [...albumMap.values()]
+  const albums = [...albumMap.entries()]
     .sort((left, right) => {
-      const albumSort = left[0].album.localeCompare(right[0].album, undefined, { sensitivity: 'base' });
-      return albumSort || left[0].artist.localeCompare(right[0].artist, undefined, { sensitivity: 'base' });
+      const albumSort = left[1][0].album.localeCompare(right[1][0].album, undefined, { sensitivity: 'base' });
+      return albumSort || appleAlbumArtistLabel(left[1]).localeCompare(appleAlbumArtistLabel(right[1]), undefined, { sensitivity: 'base' });
     })
-    .map((albumSongs, index): MenuNode => {
+    .map(([key, albumSongs], index): MenuNode => {
       const firstSong = albumSongs[0];
       const artworkSong = albumSongs.find(song => Boolean(song.artworkUrl)) || firstSong;
-      const albumId = `${safeNodeId(firstSong.album)}_${safeNodeId(firstSong.artist)}_${index}`;
 
       return {
-        id: `cover_album_${albumId}`,
+        id: stableNodeId('cover_album', key || String(index)),
         title: firstSong.album,
         type: 'menu',
         previewImage: artworkSong.artworkUrl,
         detailLines: [
-          firstSong.artist,
+          appleAlbumArtistLabel(albumSongs),
           `${albumSongs.length} song${albumSongs.length === 1 ? '' : 's'}`,
         ],
         children: albumSongs.map(song => appleSongToMenuNode(song, 'library')),
@@ -2037,7 +2128,8 @@ const generateCalendarMenu = (local: LocalMusicMenuState = {}): MenuNode => {
 const generateSettingsMenu = (local: LocalMusicMenuState = {}): MenuNode => {
   const locale = normalizeLocale(local.language);
   const trackCount = local.tracks?.length || 0;
-  const albumCount = new Set((local.tracks || []).map(normalizeLocalAlbumKey)).size;
+  const compilationsEnabled = local.compilationsEnabled !== false;
+  const albumCount = new Set((local.tracks || []).map(track => normalizeLocalAlbumKey(track, compilationsEnabled))).size;
   const artistCount = new Set((local.tracks || []).map(track => track.artist || 'Unknown Artist')).size;
 
   return {
@@ -2178,6 +2270,17 @@ const generateSettingsMenu = (local: LocalMusicMenuState = {}): MenuNode => {
         title: t(locale, 'librarySettings'),
         type: 'menu',
         children: [
+          {
+            id: 'set_library_source',
+            title: `${tx(locale, 'Library Source', '资料库来源')}: ${librarySourceLabel(local.sourceMode, locale)}`,
+            type: 'localMusicStatus',
+            action: 'settings_cycle_library_source',
+            statusTone: normalizeLocalSourceMode(local.sourceMode) === 'squarepod' ? 'success' : 'warning',
+            detailLines: [
+              librarySourceDetail(local.sourceMode, locale),
+              'SquarePod / Android / All',
+            ],
+          },
           {
             id: 'set_auto_scan',
             title: `${t(locale, 'autoScan')}: ${enabledLabel(local.autoScan !== false, locale)}`,

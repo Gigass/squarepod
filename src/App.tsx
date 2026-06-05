@@ -6,7 +6,7 @@ import { useLocalMusic } from './useLocalMusic';
 import { useMediaLibrary } from './useMediaLibrary';
 import { useRadio } from './useRadio';
 import { useVoiceMemos } from './useVoiceMemos';
-import { LocalMusicTrack } from './native/localMusic';
+import { LocalMusicSourceMode, LocalMusicTrack } from './native/localMusic';
 import { ScreenAwake } from './native/screenAwake';
 import { ClickWheel } from './components/ClickWheel';
 import { Screen, type EbookReaderCommand, type VideoCommand } from './components/Screen';
@@ -50,6 +50,7 @@ interface ImportedEbook {
 const CONTINUATION_MODE_KEY = 'squarepod.localContinuationMode.v1';
 const UI_SOUND_VOLUME_KEY = 'squarepod.uiSoundVolume.v1';
 const AUTO_SCAN_KEY = 'squarepod.autoScan.v1';
+const LIBRARY_SOURCE_KEY = 'squarepod.librarySource.v1';
 const CONTACTS_KEY = 'squarepod.contacts.v1';
 const NOTES_KEY = 'squarepod.notes.v1';
 const CALENDAR_EVENTS_KEY = 'squarepod.calendarEvents.v1';
@@ -68,6 +69,7 @@ const DEVICE_MODE_KEY = 'squarepod.deviceMode.v1';
 const NANO6_WALLPAPER_KEY = 'squarepod.nano6Wallpaper.v1';
 const SETTINGS_DEFAULTS_VERSION_KEY = 'squarepod.settingsDefaultsVersion.v1';
 const PLAYBACK_MODE_ORDER: PlaybackMode[] = ['sequential', 'shuffle', 'repeatAll', 'repeatOne'];
+const LIBRARY_SOURCE_ORDER: LocalMusicSourceMode[] = ['squarepod', 'android', 'all'];
 const UI_SOUND_VOLUME_STEPS = [0, 0.25, 0.5, 0.75, 1];
 const DEFAULT_UI_SOUND_VOLUME = 1;
 const DEFAULT_BACKLIGHT_TIMER = 'Always On';
@@ -172,6 +174,11 @@ const readAutoScan = () => {
 const writeAutoScan = (enabled: boolean) => {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(AUTO_SCAN_KEY, String(enabled));
+};
+
+const readLibrarySource = (): LocalMusicSourceMode => {
+  const value = readString(LIBRARY_SOURCE_KEY, 'squarepod');
+  return value === 'android' || value === 'all' ? value : 'squarepod';
 };
 
 const readJson = <T,>(key: string, fallback: T): T => {
@@ -409,6 +416,7 @@ export default function App() {
   const [continuationMode, setContinuationMode] = useState<ContinuationMode>(readContinuationMode);
   const [uiSoundVolume, setUiSoundVolumeState] = useState(readUiSoundVolume);
   const [autoScan, setAutoScan] = useState(readAutoScan);
+  const [librarySource, setLibrarySource] = useState<LocalMusicSourceMode>(readLibrarySource);
   const [contacts, setContacts] = useState<ContactEntry[]>(() => readArray(CONTACTS_KEY));
   const [notes, setNotes] = useState<NoteEntry[]>(() => readArray(NOTES_KEY));
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventEntry[]>(() => readArray(CALENDAR_EVENTS_KEY));
@@ -437,7 +445,7 @@ export default function App() {
   const [stopwatchElapsedMs, setStopwatchElapsedMs] = useState(0);
   const [videoCommand, setVideoCommand] = useState<VideoCommand>();
   const [ebookReaderCommand, setEbookReaderCommand] = useState<EbookReaderCommand>();
-  const localMusic = useLocalMusic({ autoScan });
+  const localMusic = useLocalMusic({ autoScan, sourceMode: librarySource });
   const mediaLibrary = useMediaLibrary();
   const radio = useRadio();
   const voiceMemos = useVoiceMemos();
@@ -465,6 +473,9 @@ export default function App() {
     message: localMusic.message,
     tracks: localMusic.tracks,
     musicDirectory: localMusic.musicDirectory,
+    publicMusicDirectory: localMusic.publicMusicDirectory,
+    sourceMode: localMusic.sourceMode,
+    sourceCounts: localMusic.sourceCounts,
     currentTrack: localMusic.currentTrack,
     continuationMode,
     uiSoundVolume,
@@ -510,6 +521,9 @@ export default function App() {
     localMusic.message,
     localMusic.tracks,
     localMusic.musicDirectory,
+    localMusic.publicMusicDirectory,
+    localMusic.sourceMode,
+    localMusic.sourceCounts,
     currentTrackMenuKey,
     continuationMode,
     uiSoundVolume,
@@ -645,6 +659,8 @@ export default function App() {
   useEffect(() => {
     writeAutoScan(autoScan);
   }, [autoScan]);
+
+  useEffect(() => { writeString(LIBRARY_SOURCE_KEY, librarySource); }, [librarySource]);
 
   useEffect(() => { writeJson(CONTACTS_KEY, contacts); }, [contacts]);
   useEffect(() => { writeJson(NOTES_KEY, notes); }, [notes]);
@@ -1296,6 +1312,12 @@ export default function App() {
       case 'settings_toggle_auto_scan':
         setAutoScan(!autoScan);
         break;
+      case 'settings_cycle_library_source':
+        setLibrarySource(current => {
+          const currentIndex = Math.max(0, LIBRARY_SOURCE_ORDER.indexOf(current));
+          return LIBRARY_SOURCE_ORDER[(currentIndex + 1) % LIBRARY_SOURCE_ORDER.length];
+        });
+        break;
       case 'media_scan':
         await mediaLibrary.scanMedia();
         break;
@@ -1499,6 +1521,7 @@ export default function App() {
       case 'settings_reset':
         setUiSoundVolumeState(DEFAULT_UI_SOUND_VOLUME);
         setAutoScan(true);
+        setLibrarySource('squarepod');
         setContinuationMode('library');
         setMainMenuEnabled({});
         setBacklightTimer(DEFAULT_BACKLIGHT_TIMER);
@@ -1511,6 +1534,7 @@ export default function App() {
         setSleepTimer(DEFAULT_SLEEP_TIMER);
         setStopwatch(DEFAULT_STOPWATCH);
         writeContinuationMode('library');
+        writeString(LIBRARY_SOURCE_KEY, 'squarepod');
         writeString(BACKLIGHT_TIMER_KEY, DEFAULT_BACKLIGHT_TIMER);
         writeUiSoundVolume(DEFAULT_UI_SOUND_VOLUME);
         writeString(SETTINGS_DEFAULTS_VERSION_KEY, SETTINGS_DEFAULTS_VERSION);

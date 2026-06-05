@@ -1,6 +1,8 @@
 import { PluginListenerHandle, registerPlugin } from '@capacitor/core';
 
 export type LocalRepeatMode = 'off' | 'one' | 'all';
+export type LocalMusicSourceMode = 'squarepod' | 'android' | 'all';
+export type LocalMusicTrackSource = 'appFolder' | 'publicSquarePod' | 'mediaStore';
 
 export interface LocalLyricLine {
   time: number;
@@ -13,16 +15,23 @@ export interface LocalMusicTrack {
   title: string;
   artist: string;
   album: string;
+  albumArtist?: string;
+  albumId?: string;
   genre?: string;
   duration: number;
   trackNumber: number;
   artworkUri?: string;
   lyrics?: LocalLyricLine[];
+  source?: LocalMusicTrackSource;
+  sourcePath?: string;
 }
 
 export interface LocalMusicLibrary {
   tracks: LocalMusicTrack[];
   musicDirectory: string;
+  publicMusicDirectory?: string;
+  sourceMode?: LocalMusicSourceMode;
+  sourceCounts?: Partial<Record<LocalMusicTrackSource, number>>;
 }
 
 export interface LocalMusicPlaybackState {
@@ -39,7 +48,7 @@ export interface LocalMusicPlaybackState {
 }
 
 export interface LocalMusicPlugin {
-  scanLibrary(): Promise<LocalMusicLibrary>;
+  scanLibrary(options?: { sourceMode?: LocalMusicSourceMode }): Promise<LocalMusicLibrary>;
   playQueue(options: { tracks: LocalMusicTrack[]; startIndex?: number; shuffle?: boolean; repeatMode?: LocalRepeatMode }): Promise<LocalMusicPlaybackState>;
   play(): Promise<LocalMusicPlaybackState>;
   pause(): Promise<LocalMusicPlaybackState>;
