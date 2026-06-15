@@ -15,10 +15,10 @@ The core product path is local Android media playback. SquarePod scans its own m
 
 ### Current Build
 
-- Version: `V1.7`
+- Version: `V1.8`
 - Device modes: `Nano6 + Classic`
 - Android package: `com.squarepod.app`
-- Current Android debug build: `versionName 1.7`, `versionCode 8`
+- Current Android debug build: `versionName 1.8`, `versionCode 9`
 
 ### Screenshots
 
@@ -157,27 +157,27 @@ npm run android:build
 This runs the web build, syncs Capacitor assets, and builds:
 
 ```text
-android/app/build/outputs/apk/debug/SquarePod-V1.7-Android-Debug.apk
+android/app/build/outputs/apk/debug/SquarePod-V1.8-Android-Debug.apk
 ```
 
 Current debug package version:
 
 ```text
-versionName 1.7
-versionCode 8
+versionName 1.8
+versionCode 9
 ```
 
 Install and launch:
 
 ```sh
-adb install -r android/app/build/outputs/apk/debug/SquarePod-V1.7-Android-Debug.apk
+adb install -r android/app/build/outputs/apk/debug/SquarePod-V1.8-Android-Debug.apk
 adb shell am start -n com.squarepod.app/.MainActivity
 ```
 
 For a specific device:
 
 ```sh
-adb -s <device-id> install -r android/app/build/outputs/apk/debug/SquarePod-V1.7-Android-Debug.apk
+adb -s <device-id> install -r android/app/build/outputs/apk/debug/SquarePod-V1.8-Android-Debug.apk
 adb -s <device-id> shell am start -n com.squarepod.app/.MainActivity
 ```
 
@@ -317,10 +317,10 @@ SquarePod 是一个 Android-first 的本地音乐播放器，提供两种 iPod �
 
 ### 当前版本
 
-- 版本：`V1.7`
+- 版本：`V1.8`
 - 设备模式：`Nano6 + Classic`
 - Android 包名：`com.squarepod.app`
-- 当前 Android Debug 包：`versionName 1.7`，`versionCode 8`
+- 当前 Android Debug 包：`versionName 1.8`，`versionCode 9`
 
 ### 截图
 
@@ -459,27 +459,27 @@ npm run android:build
 它会先构建 Web，再同步 Capacitor 资源，最后生成：
 
 ```text
-android/app/build/outputs/apk/debug/SquarePod-V1.7-Android-Debug.apk
+android/app/build/outputs/apk/debug/SquarePod-V1.8-Android-Debug.apk
 ```
 
 当前 Debug 包版本：
 
 ```text
-versionName 1.7
-versionCode 8
+versionName 1.8
+versionCode 9
 ```
 
 安装并启动：
 
 ```sh
-adb install -r android/app/build/outputs/apk/debug/SquarePod-V1.7-Android-Debug.apk
+adb install -r android/app/build/outputs/apk/debug/SquarePod-V1.8-Android-Debug.apk
 adb shell am start -n com.squarepod.app/.MainActivity
 ```
 
 指定设备：
 
 ```sh
-adb -s <device-id> install -r android/app/build/outputs/apk/debug/SquarePod-V1.7-Android-Debug.apk
+adb -s <device-id> install -r android/app/build/outputs/apk/debug/SquarePod-V1.8-Android-Debug.apk
 adb -s <device-id> shell am start -n com.squarepod.app/.MainActivity
 ```
 
