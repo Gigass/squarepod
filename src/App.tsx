@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { strFromU8, unzipSync } from 'fflate';
 import { CalendarEventEntry, ContactEntry, DEFAULT_EBOOKS, EbookEntry, generateMenuRoot, isMainMenuItemEnabled, NoteEntry, normalizeMainMenuOrder, SleepTimerMenuState, WorkoutEntry } from './data';
-import { DeviceMode, EditorFieldKey, EditorMode, MenuNode, PlaybackMode, SleepTimerEndAction, TextEditorState } from './types';
+import { AppTheme, DeviceMode, EditorFieldKey, EditorMode, MenuNode, PlaybackMode, SleepTimerEndAction, TextEditorState } from './types';
 import { useLocalMusic } from './useLocalMusic';
 import { useMediaLibrary } from './useMediaLibrary';
 import { useRadio } from './useRadio';
@@ -66,6 +66,7 @@ const EQ_KEY = 'squarepod.eq.v1';
 const COMPILATIONS_KEY = 'squarepod.compilations.v1';
 const LANGUAGE_KEY = 'squarepod.language.v1';
 const DEVICE_MODE_KEY = 'squarepod.deviceMode.v1';
+const THEME_KEY = 'squarepod.theme.v1';
 const NANO6_WALLPAPER_KEY = 'squarepod.nano6Wallpaper.v1';
 const SETTINGS_DEFAULTS_VERSION_KEY = 'squarepod.settingsDefaultsVersion.v1';
 const PLAYBACK_MODE_ORDER: PlaybackMode[] = ['sequential', 'shuffle', 'repeatAll', 'repeatOne'];
@@ -223,6 +224,10 @@ const writeString = (key: string, value: string) => {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(key, value);
 };
+
+const readTheme = (): AppTheme => (
+  readString(THEME_KEY, 'light') === 'dark' ? 'dark' : 'light'
+);
 
 const readBoolean = (key: string, fallback: boolean) => {
   if (typeof window === 'undefined') return fallback;
@@ -436,6 +441,7 @@ export default function App() {
   const [compilationsEnabled, setCompilationsEnabled] = useState(() => readBoolean(COMPILATIONS_KEY, true));
   const [language, setLanguage] = useState<Locale>(() => normalizeLocale(readString(LANGUAGE_KEY, 'en')));
   const [deviceMode, setDeviceMode] = useState<DeviceMode>(readDeviceMode);
+  const [theme, setTheme] = useState<AppTheme>(readTheme);
   const [nano6Wallpaper, setNano6Wallpaper] = useState(() => readString(NANO6_WALLPAPER_KEY, ''));
   const [screenLocked, setScreenLocked] = useState(false);
   const [unlockArmed, setUnlockArmed] = useState(false);
@@ -516,6 +522,7 @@ export default function App() {
     compilationsEnabled,
     language,
     deviceMode,
+    theme,
   }), [
     localMusic.status,
     localMusic.message,
@@ -560,6 +567,7 @@ export default function App() {
     compilationsEnabled,
     language,
     deviceMode,
+    theme,
   ]);
 
   const [stack, setStack] = useState<StackItem[]>([{ node: rootMenu, cursorIndex: 0 }]);
@@ -677,6 +685,7 @@ export default function App() {
   useEffect(() => { writeBoolean(COMPILATIONS_KEY, compilationsEnabled); }, [compilationsEnabled]);
   useEffect(() => { writeString(LANGUAGE_KEY, language); }, [language]);
   useEffect(() => { writeString(DEVICE_MODE_KEY, deviceMode); }, [deviceMode]);
+  useEffect(() => { writeString(THEME_KEY, theme); }, [theme]);
   useEffect(() => { writeString(NANO6_WALLPAPER_KEY, nano6Wallpaper); }, [nano6Wallpaper]);
 
   useEffect(() => {
@@ -1301,6 +1310,9 @@ export default function App() {
           return UI_SOUND_VOLUME_STEPS[nextIndex >= 0 ? nextIndex : 0];
         });
         break;
+      case 'settings_toggle_theme':
+        setTheme(current => current === 'dark' ? 'light' : 'dark');
+        break;
       case 'settings_cycle_device_mode':
         switchDeviceMode(current => current === 'clickWheel' ? 'nano6Touch' : 'clickWheel');
         break;
@@ -1529,6 +1541,7 @@ export default function App() {
         await localMusic.setEqPreset('Off');
         setCompilationsEnabled(true);
         setLanguage('en');
+        setTheme('light');
         switchDeviceMode('clickWheel');
         setNoteDraft(undefined);
         setSleepTimer(DEFAULT_SLEEP_TIMER);
@@ -1536,6 +1549,7 @@ export default function App() {
         writeContinuationMode('library');
         writeString(LIBRARY_SOURCE_KEY, 'squarepod');
         writeString(BACKLIGHT_TIMER_KEY, DEFAULT_BACKLIGHT_TIMER);
+        writeString(THEME_KEY, 'light');
         writeUiSoundVolume(DEFAULT_UI_SOUND_VOLUME);
         writeString(SETTINGS_DEFAULTS_VERSION_KEY, SETTINGS_DEFAULTS_VERSION);
         await setPlaybackMode('sequential');
@@ -2077,6 +2091,11 @@ export default function App() {
     setNano6Wallpaper(url);
   };
 
+  const isClassicDarkTheme = theme === 'dark';
+  const classicFrameClass = isClassicDarkTheme
+    ? 'relative w-[min(100vw,100vh)] h-[min(100vw,100vh)] rounded-[56px] border-8 border-[#050303] bg-[radial-gradient(circle_at_50%_16%,rgba(255,255,255,0.08),transparent_30%),linear-gradient(145deg,#211b1d_0%,#0c0a0b_48%,#171113_100%)] px-5 pt-4 pb-3 flex flex-col items-center shadow-[0_35px_70px_-16px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-16px_30px_rgba(0,0,0,0.45)]'
+    : 'relative w-[min(100vw,100vh)] h-[min(100vw,100vh)] bg-gradient-to-br from-gray-50 to-gray-200 rounded-[56px] shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] border-8 border-white px-5 pt-4 pb-3 flex flex-col items-center';
+
   if (deviceMode === 'nano6Touch') {
     return (
       <>
@@ -2147,7 +2166,7 @@ export default function App() {
           });
         }}
       />
-      <div className="relative w-[min(100vw,100vh)] h-[min(100vw,100vh)] bg-gradient-to-br from-gray-50 to-gray-200 rounded-[56px] shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] border-8 border-white px-5 pt-4 pb-3 flex flex-col items-center">
+      <div className={classicFrameClass}>
         
         {/* Top Section: Screen */}
         <div className={`w-full h-[56%] shrink-0 pb-0 transition-opacity duration-300 ${screenDimmed ? 'opacity-35' : 'opacity-100'}`}>
@@ -2180,6 +2199,7 @@ export default function App() {
             onEbookProgress={updateEbookProgress}
             onCoverFlowSettleTarget={setCoverFlowCursorIndex}
             alphaJumpKey={alphaJumpKey}
+            theme={theme}
           />
         </div>
 
@@ -2196,6 +2216,7 @@ export default function App() {
             onPrevLongPress={() => seekRelative(-SEEK_STEP_SECONDS)}
             onRotateStart={handleRotateStart}
             onRotateEnd={handleRotateEnd}
+            theme={theme}
           />
         </div>
 

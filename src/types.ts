@@ -7,6 +7,7 @@ import { SpotifyPlaylist, SpotifyPlaylistTrack, SpotifyShortcut, SpotifyTrack } 
 export type ShuffleMode = 'off' | 'songs';
 export type PlaybackMode = 'sequential' | 'shuffle' | 'repeatAll' | 'repeatOne';
 export type DeviceMode = 'clickWheel' | 'nano6Touch';
+export type AppTheme = 'light' | 'dark';
 export type EditorKind = 'note' | 'contact' | 'calendarEvent' | 'ebook' | 'workout';
 export type EditorMode = 'create' | 'edit';
 export type EditorFieldKey = 'title' | 'body' | 'name' | 'phone' | 'email' | 'date' | 'time' | 'notes';
@@ -36,6 +37,7 @@ export type MenuAction =
   | 'local_toggle_continuation'
   | 'player_shuffle_all'
   | 'settings_cycle_click_sound'
+  | 'settings_toggle_theme'
   | 'settings_cycle_device_mode'
   | 'settings_set_device_mode'
   | 'settings_toggle_auto_scan'

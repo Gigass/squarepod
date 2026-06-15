@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MenuNode, PlaybackMode, Song, TextEditorState } from '../types';
+import { AppTheme, MenuNode, PlaybackMode, Song, TextEditorState } from '../types';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { CachedImage } from './CachedImage';
 import { DeviceStatus } from '../native/deviceStatus';
@@ -49,6 +49,7 @@ interface ScreenProps {
   onEbookProgress: (ebookId: string, progress: number, chapterIndex?: number) => void;
   onCoverFlowSettleTarget: (index: number) => void;
   alphaJumpKey?: string;
+  theme?: AppTheme;
 }
 
 const COVER_FLOW_DRAG_MAX_SPEED = 14;
@@ -69,28 +70,36 @@ const tx = (locale: Locale | string | undefined, en: string, zhCN: string, value
   text(locale, { en, 'zh-CN': zhCN }, values)
 );
 
-const AppleSwitch = ({ checked, selected = false }: { checked: boolean; selected?: boolean }) => (
-  <motion.div
-    className={`relative h-[18px] w-[32px] shrink-0 rounded-full border shadow-inner ${
-      checked
-        ? selected ? 'border-white/70 bg-white/95' : 'border-green-500 bg-green-500'
-        : selected ? 'border-white/60 bg-white/25' : 'border-gray-300 bg-gray-200'
-    }`}
-    animate={{
-      backgroundColor: checked ? (selected ? '#ffffff' : '#22c55e') : (selected ? 'rgba(255,255,255,0.25)' : '#e5e7eb'),
-      borderColor: checked ? (selected ? 'rgba(255,255,255,0.75)' : '#22c55e') : (selected ? 'rgba(255,255,255,0.6)' : '#d1d5db'),
-    }}
-    transition={{ type: 'spring', stiffness: 520, damping: 34 }}
-  >
+const AppleSwitch = ({ checked, selected = false, theme = 'light' }: { checked: boolean; selected?: boolean; theme?: AppTheme }) => {
+  const isDarkTheme = theme === 'dark';
+  const checkedColor = isDarkTheme ? '#d6001c' : '#22c55e';
+  const offColor = isDarkTheme ? '#251b1d' : '#e5e7eb';
+  const selectedOffColor = isDarkTheme ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.25)';
+  const selectedCheckedColor = isDarkTheme ? '#f4eeea' : '#ffffff';
+
+  return (
     <motion.div
-      className={`absolute top-[2px] h-[12px] w-[12px] rounded-full shadow-sm ${
-        checked && selected ? 'bg-blue-600' : 'bg-white'
+      className={`relative h-[18px] w-[32px] shrink-0 rounded-full border shadow-inner ${
+        checked
+          ? selected ? 'border-white/70' : isDarkTheme ? 'border-[#d6001c]' : 'border-green-500'
+          : selected ? 'border-white/60' : isDarkTheme ? 'border-[#554448]' : 'border-gray-300'
       }`}
-      animate={{ x: checked ? 16 : 2 }}
-      transition={{ type: 'spring', stiffness: 620, damping: 32 }}
-    />
-  </motion.div>
-);
+      animate={{
+        backgroundColor: checked ? (selected ? selectedCheckedColor : checkedColor) : (selected ? selectedOffColor : offColor),
+        borderColor: checked ? (selected ? 'rgba(255,255,255,0.75)' : checkedColor) : (selected ? 'rgba(255,255,255,0.6)' : isDarkTheme ? '#554448' : '#d1d5db'),
+      }}
+      transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+    >
+      <motion.div
+        className={`absolute top-[2px] h-[12px] w-[12px] rounded-full shadow-sm ${
+          checked && selected ? (isDarkTheme ? 'bg-[#d6001c]' : 'bg-blue-600') : 'bg-white'
+        }`}
+        animate={{ x: checked ? 16 : 2 }}
+        transition={{ type: 'spring', stiffness: 620, damping: 32 }}
+      />
+    </motion.div>
+  );
+};
 
 const resolveNativeMediaSrc = (sourceUrl?: string) => {
   if (!sourceUrl) return undefined;
@@ -152,12 +161,15 @@ function ClassicEbookReader({
   command,
   locale,
   onEbookProgress,
+  theme = 'light',
 }: {
   node: MenuNode;
   command?: EbookReaderCommand;
   locale: Locale;
   onEbookProgress: ScreenProps['onEbookProgress'];
+  theme?: AppTheme;
 }) {
+  const isDarkTheme = theme === 'dark';
   const body = node.ebookBody || '';
   const chapters = React.useMemo(() => splitClassicEbookChapters(body, locale), [body, locale]);
   const initialChapter = React.useMemo(() => {
@@ -228,23 +240,23 @@ function ClassicEbookReader({
 
   if (!body.trim()) {
     return (
-      <div className="flex-1 bg-[#f3efe3] px-7 flex flex-col items-center justify-center text-center">
-        <svg className="h-10 w-10 text-[#8b7d61]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <div className={`flex-1 px-7 flex flex-col items-center justify-center text-center ${isDarkTheme ? 'bg-[#151112]' : 'bg-[#f3efe3]'}`}>
+        <svg className={`h-10 w-10 ${isDarkTheme ? 'text-[#8f7b80]' : 'text-[#8b7d61]'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
           <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z" />
         </svg>
-        <div className="mt-3 text-sm font-black leading-tight text-neutral-900">{tx(locale, 'No readable text', '没有可阅读文本')}</div>
-        <div className="mt-2 text-[11px] font-bold leading-tight text-neutral-600">{tx(locale, 'Edit this book and paste plain text first.', '请先编辑图书并粘贴纯文本。')}</div>
+        <div className={`mt-3 text-sm font-black leading-tight ${isDarkTheme ? 'text-[#f4eeee]' : 'text-neutral-900'}`}>{tx(locale, 'No readable text', '没有可阅读文本')}</div>
+        <div className={`mt-2 text-[11px] font-bold leading-tight ${isDarkTheme ? 'text-[#a89499]' : 'text-neutral-600'}`}>{tx(locale, 'Edit this book and paste plain text first.', '请先编辑图书并粘贴纯文本。')}</div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 bg-[#f3efe3] text-[#211f1a] flex flex-col overflow-hidden">
-      <div className="h-[27px] shrink-0 border-b border-[#d7cdb9] bg-[#ebe1cd] px-4 flex items-center gap-3">
+    <div className={`flex-1 flex flex-col overflow-hidden ${isDarkTheme ? 'bg-[#151112] text-[#eee4df]' : 'bg-[#f3efe3] text-[#211f1a]'}`}>
+      <div className={`h-[27px] shrink-0 border-b px-4 flex items-center gap-3 ${isDarkTheme ? 'border-[#3b2d31] bg-[#21191c]' : 'border-[#d7cdb9] bg-[#ebe1cd]'}`}>
         <div className="min-w-0 flex-1 truncate text-[11px] font-black leading-none">{activeChapter?.title || node.title}</div>
-        <div className="shrink-0 text-[9px] font-black tabular-nums leading-none text-[#7a6d57]">{Math.round(readProgress * 100)}%</div>
-        <div className="shrink-0 text-[9px] font-black tabular-nums leading-none text-[#7a6d57]">{chapterIndex + 1}/{chapters.length}</div>
+        <div className={`shrink-0 text-[9px] font-black tabular-nums leading-none ${isDarkTheme ? 'text-[#e01830]' : 'text-[#7a6d57]'}`}>{Math.round(readProgress * 100)}%</div>
+        <div className={`shrink-0 text-[9px] font-black tabular-nums leading-none ${isDarkTheme ? 'text-[#a89499]' : 'text-[#7a6d57]'}`}>{chapterIndex + 1}/{chapters.length}</div>
       </div>
       <div
         ref={scrollerRef}
@@ -255,7 +267,7 @@ function ClassicEbookReader({
           {activeChapter?.body || body.replace(/^\s{0,3}#{1,3}\s+/gm, '')}
         </div>
       </div>
-      <div className="h-[20px] shrink-0 border-t border-[#d7cdb9] bg-[#ebe1cd] px-4 flex items-center justify-between text-[8px] font-black uppercase leading-none text-[#7a6d57]">
+      <div className={`h-[20px] shrink-0 border-t px-4 flex items-center justify-between text-[8px] font-black uppercase leading-none ${isDarkTheme ? 'border-[#3b2d31] bg-[#21191c] text-[#a89499]' : 'border-[#d7cdb9] bg-[#ebe1cd] text-[#7a6d57]'}`}>
         <span>{tx(locale, 'Wheel scroll', '滚轮滚动')}</span>
         <span>{tx(locale, 'Prev/Next chapter', '上一章/下一章')}</span>
         <span>{tx(locale, 'Menu back', 'Menu 返回')}</span>
@@ -293,6 +305,7 @@ export function Screen({
   onEbookProgress,
   onCoverFlowSettleTarget,
   alphaJumpKey,
+  theme = 'light',
 }: ScreenProps) {
   const [coverFlowPosition, setCoverFlowPosition] = useState(cursorIndex);
   const [batteryPercent, setBatteryPercent] = useState<number>();
@@ -313,6 +326,45 @@ export function Screen({
   const coverFlowAlbumCount = currentNode.type === 'coverFlow'
     ? currentNode.children?.length || 0
     : 0;
+  const isDarkTheme = theme === 'dark';
+  const screenRootClass = isDarkTheme
+    ? 'relative w-full h-full bg-[#100d0e] border-[4px] border-[#302426] rounded-[36px] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_0_18px_rgba(0,0,0,0.78)] flex flex-col overflow-hidden'
+    : 'relative w-full h-full bg-white border-[4px] border-neutral-900 rounded-[36px] shadow-inner flex flex-col overflow-hidden';
+  const headerClass = isDarkTheme
+    ? 'bg-[linear-gradient(180deg,#2a2325_0%,#151113_100%)] h-[24px] min-h-[24px] max-h-[24px] shrink-0 border-b border-[#3a2b2f] flex items-center justify-between px-6 overflow-hidden'
+    : 'bg-gradient-to-b from-gray-100 to-gray-200 h-[24px] min-h-[24px] max-h-[24px] shrink-0 border-b border-gray-300 flex items-center justify-between px-6 overflow-hidden';
+  const headerTextClass = isDarkTheme ? 'text-[#e8e1df]' : 'text-gray-700';
+  const batteryShellClass = isDarkTheme
+    ? 'relative h-2 w-4 rounded-sm border border-[#5b4b4f] bg-[#0b090a]'
+    : 'relative h-2 w-4 rounded-sm border border-gray-400 bg-white';
+  const leftPaneClass = isDarkTheme
+    ? 'w-1/2 h-full flex flex-col border-r border-[#38292d] bg-[#120f10]'
+    : 'w-1/2 h-full flex flex-col border-r border-gray-300 bg-white';
+  const previewSurfaceClass = isDarkTheme ? 'bg-[#171314]' : 'bg-neutral-50';
+  const mainSurfaceClass = isDarkTheme ? 'bg-[#171314]' : 'bg-neutral-50';
+  const cardSurfaceClass = isDarkTheme ? 'bg-[#241c1f]' : 'bg-neutral-200';
+  const imageFallbackClass = isDarkTheme
+    ? 'bg-[linear-gradient(135deg,#2b2225_0%,#151113_48%,#5f000b_100%)]'
+    : 'bg-gradient-to-br from-neutral-300 to-neutral-600';
+  const dividerClass = isDarkTheme ? 'border-[#38292d]' : 'border-gray-200';
+  const primaryTextClass = isDarkTheme ? 'text-[#f4eeee]' : 'text-gray-900';
+  const strongTextClass = isDarkTheme ? 'text-[#f8f2ef]' : 'text-gray-950';
+  const secondaryTextClass = isDarkTheme ? 'text-[#c9bbbe]' : 'text-gray-700';
+  const mutedTextClass = isDarkTheme ? 'text-[#8f7d82]' : 'text-gray-500';
+  const faintTextClass = isDarkTheme ? 'text-[#6f5e63]' : 'text-gray-400';
+  const accentTextClass = isDarkTheme ? 'text-[#e01830]' : 'text-blue-600';
+  const accentFillClass = isDarkTheme ? 'bg-[#d6001c]' : 'bg-blue-500';
+  const accentButtonClass = isDarkTheme ? 'bg-[#d6001c]' : 'bg-blue-600';
+  const accentSelectionClass = isDarkTheme
+    ? 'bg-[linear-gradient(180deg,#e01830_0%,#ca001b_58%,#980014_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_3px_rgba(0,0,0,0.5)]'
+    : 'bg-gradient-to-b from-blue-400 to-blue-600 shadow-sm';
+  const progressTrackClass = isDarkTheme ? 'bg-[#35272b]' : 'bg-gray-300';
+  const loadingTrackClass = isDarkTheme ? 'bg-[#2a2023]' : 'bg-gray-200';
+  const spinnerIdleClass = isDarkTheme ? 'border-[#59464b] border-t-[#d6001c]' : 'border-gray-300 border-t-blue-500';
+  const sectionMarkerClass = isDarkTheme ? 'text-[#e01830]/85' : 'text-blue-500/80';
+  const selectedTextClass = 'text-white';
+  const unselectedMenuTextClass = isDarkTheme ? 'text-[#e4dcda]' : 'text-gray-800';
+  const unselectedMenuMetaClass = isDarkTheme ? 'text-[#806c71]' : 'text-gray-400';
 
   useEffect(() => {
     const previousNodeId = coverFlowPreviousNodeIdRef.current;
@@ -543,7 +595,7 @@ export function Screen({
       return (
         <motion.div
           key={`${line.time}-${line.text}`}
-          className="mt-2 w-full min-h-[20px] px-1 text-center text-[9px] font-black leading-[1.2] text-gray-700 line-clamp-2"
+          className={`mt-2 w-full min-h-[20px] px-1 text-center text-[9px] font-black leading-[1.2] line-clamp-2 ${secondaryTextClass}`}
           initial={{ opacity: 0, y: 3 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.18, ease: 'easeOut' }}
@@ -554,7 +606,7 @@ export function Screen({
     }
 
     return (
-      <div className="mt-4 flex min-h-[80px] flex-col justify-center gap-[2px] overflow-hidden border-t border-gray-200 pt-3">
+      <div className={`mt-4 flex min-h-[80px] flex-col justify-center gap-[2px] overflow-hidden border-t pt-3 ${dividerClass}`}>
         {visibleIndexes.map(index => {
           const line = lyrics[index];
           const isActive = index === focusIndex;
@@ -563,8 +615,8 @@ export function Screen({
               key={`${line.time}-${line.text}`}
               className={`line-clamp-2 leading-[1.2] ${
                 isActive
-                  ? 'text-[11px] font-black text-gray-950'
-                  : 'text-[9px] font-bold text-gray-400'
+                  ? `text-[11px] font-black ${strongTextClass}`
+                  : `text-[9px] font-bold ${faintTextClass}`
               }`}
               animate={{ opacity: isActive ? 1 : 0.52, y: 0 }}
               initial={{ opacity: 0, y: isActive ? 4 : 2 }}
@@ -609,25 +661,25 @@ export function Screen({
   };
 
   const renderHeader = () => (
-    <div className="bg-gradient-to-b from-gray-100 to-gray-200 h-[24px] min-h-[24px] max-h-[24px] shrink-0 border-b border-gray-300 flex items-center justify-between px-6 overflow-hidden">
+    <div className={headerClass}>
       <div className="flex items-center space-x-1 w-16 h-full">
         {isPlaying && (
-          <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" className="text-gray-700">
+          <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" className={headerTextClass}>
              <path d="M0 0h3v12H0zm7 0h3v12H7z" />
           </svg>
         )}
       </div>
-      <div className="flex h-full flex-1 items-center justify-center pt-[2px] text-center text-[10px] font-bold uppercase leading-none tracking-tighter text-gray-700">
+      <div className={`flex h-full flex-1 items-center justify-center pt-[2px] text-center text-[10px] font-bold uppercase leading-none tracking-tighter ${headerTextClass}`}>
         <span className="truncate">{currentNode.title}</span>
       </div>
-      <div className="flex items-center justify-end w-16 h-full gap-1 text-gray-700">
+      <div className={`flex items-center justify-end w-16 h-full gap-1 ${headerTextClass}`}>
          {renderPlaybackModeIcon()}
          {batteryPercent !== undefined && (
-           <span className="min-w-[21px] text-right text-[9px] font-black leading-none tabular-nums text-gray-700">
+           <span className={`min-w-[21px] text-right text-[9px] font-black leading-none tabular-nums ${headerTextClass}`}>
              {batteryPercent}%
            </span>
          )}
-         <div className="relative h-2 w-4 rounded-sm border border-gray-400 bg-white">
+         <div className={batteryShellClass}>
            <div
              className={`h-full rounded-[1px] ${batteryPercent !== undefined && batteryPercent <= 15 ? 'bg-red-500' : 'bg-green-500'}`}
              style={{ width: `${batteryPercent ?? 100}%` }}
@@ -647,8 +699,8 @@ export function Screen({
       const isVideoPreview = selectedChild.mediaItem?.kind === 'video' || selectedChild.id === 'v_all';
 
       return (
-        <div className="w-1/2 h-full bg-neutral-50 flex items-center justify-center p-6">
-          <div className="relative w-full aspect-square overflow-hidden rounded-sm bg-neutral-200 shadow-lg">
+        <div className={`w-1/2 h-full flex items-center justify-center p-6 ${previewSurfaceClass}`}>
+          <div className={`relative w-full aspect-square overflow-hidden rounded-sm shadow-lg ${cardSurfaceClass}`}>
             <CachedImage src={selectedChild.previewImage} className="h-full w-full object-cover" />
             {isVideoPreview && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/20">
@@ -672,8 +724,8 @@ export function Screen({
       const remaining = Math.max(0, duration - progress);
 
       return (
-        <div className="w-1/2 h-full bg-neutral-50 flex flex-col items-center justify-center p-6">
-          <div className="w-full aspect-square shadow-lg relative group overflow-hidden rounded-sm bg-neutral-300">
+        <div className={`w-1/2 h-full flex flex-col items-center justify-center p-6 ${previewSurfaceClass}`}>
+          <div className={`w-full aspect-square shadow-lg relative group overflow-hidden rounded-sm ${isDarkTheme ? 'bg-[#2b2225]' : 'bg-neutral-300'}`}>
             <CachedImage src={currentSong.coverUrl} className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-white text-center">
               <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 mt-auto">{t(locale, 'nowPlaying')}</p>
@@ -682,15 +734,15 @@ export function Screen({
             </div>
           </div>
           <div className="mt-4 w-full px-2">
-            <div className="h-1 bg-gray-300 rounded-full w-full overflow-hidden">
+            <div className={`h-1 rounded-full w-full overflow-hidden ${progressTrackClass}`}>
               <div 
-                className="h-full bg-blue-500" 
+                className={`h-full ${accentFillClass}`} 
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
             <div className="flex justify-between mt-1">
-              <span className="text-[8px] text-gray-400 font-bold">{formatTime(progress)}</span>
-              <span className="text-[8px] text-gray-400 font-bold">-{formatTime(remaining)}</span>
+              <span className={`text-[8px] font-bold ${faintTextClass}`}>{formatTime(progress)}</span>
+              <span className={`text-[8px] font-bold ${faintTextClass}`}>-{formatTime(remaining)}</span>
             </div>
             {renderLyricLines('compact')}
           </div>
@@ -700,31 +752,31 @@ export function Screen({
 
     if (selectedChild?.detailLines?.length) {
       return (
-        <div className="w-1/2 h-full bg-neutral-50 flex flex-col justify-center p-5 overflow-hidden shadow-inner">
+        <div className={`w-1/2 h-full flex flex-col justify-center p-5 overflow-hidden shadow-inner ${previewSurfaceClass}`}>
           <div className="flex items-center gap-2">
             {selectedChild.isLoading && (
               <motion.div
-                className="h-3 w-3 shrink-0 rounded-full border-2 border-gray-300 border-t-blue-500"
+                className={`h-3 w-3 shrink-0 rounded-full border-2 ${spinnerIdleClass}`}
                 animate={{ rotate: 360 }}
                 transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
               />
             )}
-            <div className="text-sm font-bold leading-tight text-gray-900 truncate">{selectedChild.title}</div>
+            <div className={`text-sm font-bold leading-tight truncate ${primaryTextClass}`}>{selectedChild.title}</div>
             {typeof selectedChild.switchValue === 'boolean' && (
-              <AppleSwitch checked={Boolean(selectedChild.switchValue)} />
+              <AppleSwitch checked={Boolean(selectedChild.switchValue)} theme={theme} />
             )}
           </div>
           <div className="mt-3 space-y-2">
             {selectedChild.detailLines.map((line, index) => (
-              <div key={`${line}-${index}`} className="text-[10px] font-semibold leading-tight text-gray-500">
+              <div key={`${line}-${index}`} className={`text-[10px] font-semibold leading-tight ${mutedTextClass}`}>
                 {line}
               </div>
             ))}
           </div>
           {selectedChild.isLoading && (
-            <div className="mt-4 h-1 overflow-hidden rounded-full bg-gray-200">
+            <div className={`mt-4 h-1 overflow-hidden rounded-full ${loadingTrackClass}`}>
               <motion.div
-                className="h-full w-1/3 rounded-full bg-blue-500"
+                className={`h-full w-1/3 rounded-full ${accentFillClass}`}
                 animate={{ x: ['-100%', '300%'] }}
                 transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
               />
@@ -736,8 +788,8 @@ export function Screen({
 
     if (selectedChild?.previewIcon) {
        return (
-         <div className="w-1/2 h-full bg-neutral-50 flex items-center justify-center p-6 relative overflow-hidden shadow-inner">
-            <div className="text-gray-400">
+         <div className={`w-1/2 h-full flex items-center justify-center p-6 relative overflow-hidden shadow-inner ${previewSurfaceClass}`}>
+            <div className={faintTextClass}>
                {selectedChild.previewIcon}
             </div>
          </div>
@@ -745,8 +797,8 @@ export function Screen({
     }
 
     return (
-      <div className="w-1/2 h-full bg-neutral-50 flex items-center justify-center relative overflow-hidden shadow-inner">
-         <div className="text-gray-300 opacity-30 pointer-events-none scale-150">
+      <div className={`w-1/2 h-full flex items-center justify-center relative overflow-hidden shadow-inner ${previewSurfaceClass}`}>
+         <div className={`${isDarkTheme ? 'text-[#433238]' : 'text-gray-300'} opacity-30 pointer-events-none scale-150`}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-24 h-24">
               <circle cx="12" cy="12" r="10"></circle>
               <polygon points="10 8 16 12 10 16 10 8"></polygon>
@@ -757,32 +809,32 @@ export function Screen({
   };
 
   const renderNowPlayingFull = () => {
-    if (!currentSong) return <div className="flex-1 flex items-center justify-center text-xs font-bold font-sans">{t(locale, 'noSongSelected')}</div>;
+    if (!currentSong) return <div className={`flex-1 flex items-center justify-center text-xs font-bold font-sans ${mainSurfaceClass} ${primaryTextClass}`}>{t(locale, 'noSongSelected')}</div>;
 
     const duration = Math.max(1, currentSong.duration || 1);
     const progressPercent = Math.max(0, Math.min(100, (progress / duration) * 100));
     const remaining = Math.max(0, duration - progress);
     
     return (
-      <div className="flex-1 flex w-full h-full bg-neutral-50">
-        <div className="w-1/2 p-6 flex flex-col items-center justify-center border-r border-gray-200">
+      <div className={`flex-1 flex w-full h-full ${mainSurfaceClass}`}>
+        <div className={`w-1/2 p-6 flex flex-col items-center justify-center border-r ${dividerClass}`}>
            <CachedImage src={currentSong.coverUrl} className="w-full aspect-square object-cover shadow-lg rounded-sm" />
         </div>
         <div className="w-1/2 flex flex-col justify-center px-6 font-sans overflow-hidden">
           <div className="min-h-[74px]">
-            <div className="text-lg font-bold truncate leading-tight text-gray-900">{currentSong.title}</div>
-            <div className="text-sm font-semibold text-gray-700 truncate leading-tight mt-1">{currentSong.artist}</div>
-            <div className="text-xs text-gray-500 truncate leading-tight mt-1">{currentSong.album}</div>
+            <div className={`text-lg font-bold truncate leading-tight ${primaryTextClass}`}>{currentSong.title}</div>
+            <div className={`text-sm font-semibold truncate leading-tight mt-1 ${secondaryTextClass}`}>{currentSong.artist}</div>
+            <div className={`text-xs truncate leading-tight mt-1 ${mutedTextClass}`}>{currentSong.album}</div>
           </div>
           
           <div className="mt-4 flex flex-col w-full">
-            <div className="w-full bg-gray-300 h-1.5 rounded-full overflow-hidden">
+            <div className={`w-full h-1.5 rounded-full overflow-hidden ${progressTrackClass}`}>
               <div 
-                className="h-full bg-blue-500" 
+                className={`h-full ${accentFillClass}`} 
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <div className="flex justify-between text-[10px] font-bold text-gray-500 mt-1.5">
+            <div className={`flex justify-between text-[10px] font-bold mt-1.5 ${mutedTextClass}`}>
               <span>{formatTime(progress)}</span>
               <span>-{formatTime(remaining)}</span>
             </div>
@@ -796,34 +848,34 @@ export function Screen({
   const renderSongDetail = () => {
     const track = currentNode.localTrack;
     if (!track) {
-      return <div className="flex-1 flex items-center justify-center text-xs font-bold font-sans">{t(locale, 'noSongSelected')}</div>;
+      return <div className={`flex-1 flex items-center justify-center text-xs font-bold font-sans ${mainSurfaceClass} ${primaryTextClass}`}>{t(locale, 'noSongSelected')}</div>;
     }
 
     return (
-      <div className="flex-1 flex w-full h-full bg-neutral-50">
-        <div className="w-1/2 p-6 flex flex-col items-center justify-center border-r border-gray-200">
-          <div className="w-full aspect-square overflow-hidden rounded-sm bg-neutral-300 shadow-lg">
+      <div className={`flex-1 flex w-full h-full ${mainSurfaceClass}`}>
+        <div className={`w-1/2 p-6 flex flex-col items-center justify-center border-r ${dividerClass}`}>
+          <div className={`w-full aspect-square overflow-hidden rounded-sm shadow-lg ${isDarkTheme ? 'bg-[#2b2225]' : 'bg-neutral-300'}`}>
             {track.artworkUri ? (
               <CachedImage src={track.artworkUri} className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-neutral-300 to-neutral-600 px-3 text-center text-sm font-black uppercase leading-tight text-white/90">
+              <div className={`flex h-full w-full items-center justify-center px-3 text-center text-sm font-black uppercase leading-tight text-white/90 ${imageFallbackClass}`}>
                 {track.album || track.title}
               </div>
             )}
           </div>
         </div>
         <div className="w-1/2 flex flex-col justify-center px-6 font-sans overflow-hidden">
-          <div className="text-[10px] font-black uppercase leading-none text-blue-600">{t(locale, 'song')}</div>
-          <div className="mt-2 text-lg font-black leading-tight text-gray-950 line-clamp-2">{track.title || t(locale, 'title')}</div>
-          <div className="mt-2 text-sm font-bold leading-tight text-gray-700 line-clamp-2">{track.artist || tx(locale, 'Unknown Artist', '未知艺人')}</div>
-          <div className="mt-1 text-xs font-semibold leading-tight text-gray-500 line-clamp-2">{track.album || tx(locale, 'Unknown Album', '未知专辑')}</div>
+          <div className={`text-[10px] font-black uppercase leading-none ${accentTextClass}`}>{t(locale, 'song')}</div>
+          <div className={`mt-2 text-lg font-black leading-tight line-clamp-2 ${strongTextClass}`}>{track.title || t(locale, 'title')}</div>
+          <div className={`mt-2 text-sm font-bold leading-tight line-clamp-2 ${secondaryTextClass}`}>{track.artist || tx(locale, 'Unknown Artist', '未知艺人')}</div>
+          <div className={`mt-1 text-xs font-semibold leading-tight line-clamp-2 ${mutedTextClass}`}>{track.album || tx(locale, 'Unknown Album', '未知专辑')}</div>
           <div className="mt-5 flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm">
+            <div className={`flex h-7 w-7 items-center justify-center rounded-full text-white shadow-sm ${accentButtonClass}`}>
               <svg width="11" height="12" viewBox="0 0 10 12" fill="currentColor" aria-hidden="true">
                 <path d="M0 0l10 6-10 6z" />
               </svg>
             </div>
-            <div className="text-[11px] font-black uppercase leading-none text-gray-700">{t(locale, 'selectToPlay')}</div>
+            <div className={`text-[11px] font-black uppercase leading-none ${secondaryTextClass}`}>{t(locale, 'selectToPlay')}</div>
           </div>
         </div>
       </div>
@@ -835,7 +887,7 @@ export function Screen({
 
     return (
       <>
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-neutral-300 via-neutral-400 to-neutral-600 text-center">
+        <div className={`absolute inset-0 flex items-center justify-center text-center ${isDarkTheme ? 'bg-[linear-gradient(135deg,#2b2225_0%,#151113_46%,#64000c_100%)]' : 'bg-gradient-to-br from-neutral-300 via-neutral-400 to-neutral-600'}`}>
           <div className={`px-3 font-black uppercase leading-tight text-white/90 drop-shadow-sm ${isCenter ? 'text-sm' : 'text-[9px]'}`}>
             {title}
           </div>
@@ -858,10 +910,10 @@ export function Screen({
 
     if (!albums.length || !selectedAlbum) {
       return (
-        <div className="flex-1 bg-gradient-to-b from-neutral-100 to-neutral-200 flex flex-col items-center justify-center px-8 text-center">
-          <div className="h-24 w-24 rounded-sm border border-neutral-300 bg-gradient-to-br from-neutral-200 to-neutral-400 shadow-inner" />
-          <div className="mt-5 text-sm font-black leading-tight text-neutral-800">{t(locale, 'noAlbums')}</div>
-          <div className="mt-1 text-[11px] font-bold leading-tight text-neutral-500">{t(locale, 'scanLocalMusicFirst')}</div>
+        <div className={`flex-1 flex flex-col items-center justify-center px-8 text-center ${isDarkTheme ? 'bg-[linear-gradient(180deg,#1c1719_0%,#0f0c0d_100%)]' : 'bg-gradient-to-b from-neutral-100 to-neutral-200'}`}>
+          <div className={`h-24 w-24 rounded-sm border shadow-inner ${isDarkTheme ? 'border-[#4a383d] bg-[linear-gradient(135deg,#2c2225,#5a000b)]' : 'border-neutral-300 bg-gradient-to-br from-neutral-200 to-neutral-400'}`} />
+          <div className={`mt-5 text-sm font-black leading-tight ${isDarkTheme ? 'text-[#eee5e3]' : 'text-neutral-800'}`}>{t(locale, 'noAlbums')}</div>
+          <div className={`mt-1 text-[11px] font-bold leading-tight ${isDarkTheme ? 'text-[#9a878b]' : 'text-neutral-500'}`}>{t(locale, 'scanLocalMusicFirst')}</div>
         </div>
       );
     }
@@ -875,9 +927,9 @@ export function Screen({
     const artist = displayAlbum.detailLines?.[0] || tx(locale, 'Unknown Artist', '未知艺人');
 
     return (
-      <div className="relative flex-1 overflow-hidden bg-[linear-gradient(180deg,#f6f6f4_0%,#d9dbdf_46%,#a9adb5_47%,#f3f4f3_100%)]">
-        <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-white/65 to-transparent pointer-events-none" />
-        <div className="absolute left-1/2 top-[128px] h-[2px] w-28 -translate-x-1/2 rounded-full bg-black/20 blur-[1px]" />
+      <div className={`relative flex-1 overflow-hidden ${isDarkTheme ? 'bg-[linear-gradient(180deg,#241b1e_0%,#100d0e_46%,#050404_47%,#181113_100%)]' : 'bg-[linear-gradient(180deg,#f6f6f4_0%,#d9dbdf_46%,#a9adb5_47%,#f3f4f3_100%)]'}`}>
+        <div className={`absolute inset-x-0 top-0 h-12 pointer-events-none ${isDarkTheme ? 'bg-gradient-to-b from-white/10 to-transparent' : 'bg-gradient-to-b from-white/65 to-transparent'}`} />
+        <div className={`absolute left-1/2 top-[128px] h-[2px] w-28 -translate-x-1/2 rounded-full blur-[1px] ${isDarkTheme ? 'bg-[#d6001c]/35' : 'bg-black/20'}`} />
         <div
           className="absolute inset-x-0 top-2 h-[158px]"
           style={{ perspective: 900, transformStyle: 'preserve-3d' }}
@@ -940,7 +992,7 @@ export function Screen({
                   }}
                 >
                   <div
-                    className={`absolute inset-0 h-full w-full overflow-hidden rounded-[2px] bg-neutral-300 ${absDistance < 0.08 ? 'shadow-[0_24px_32px_-14px_rgba(0,0,0,0.72)] ring-1 ring-white/90' : 'shadow-[0_16px_20px_-15px_rgba(0,0,0,0.78)]'}`}
+                    className={`absolute inset-0 h-full w-full overflow-hidden rounded-[2px] ${isDarkTheme ? 'bg-[#2b2225]' : 'bg-neutral-300'} ${absDistance < 0.08 ? (isDarkTheme ? 'shadow-[0_24px_36px_-12px_rgba(0,0,0,0.9)] ring-1 ring-[#e01830]/70' : 'shadow-[0_24px_32px_-14px_rgba(0,0,0,0.72)] ring-1 ring-white/90') : 'shadow-[0_16px_20px_-15px_rgba(0,0,0,0.78)]'}`}
                     style={{
                       backfaceVisibility: 'hidden',
                       WebkitBackfaceVisibility: 'hidden',
@@ -948,7 +1000,7 @@ export function Screen({
                     }}
                   >
                     {renderCoverArtwork(album, absDistance < 0.08)}
-                    <div className={`absolute inset-0 pointer-events-none ${absDistance < 0.08 ? 'bg-[linear-gradient(110deg,rgba(255,255,255,0.26)_0%,rgba(255,255,255,0.04)_34%,rgba(0,0,0,0.08)_100%)]' : 'bg-black/10'}`} />
+                    <div className={`absolute inset-0 pointer-events-none ${absDistance < 0.08 ? (isDarkTheme ? 'bg-[linear-gradient(110deg,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0.025)_34%,rgba(80,0,10,0.18)_100%)]' : 'bg-[linear-gradient(110deg,rgba(255,255,255,0.26)_0%,rgba(255,255,255,0.04)_34%,rgba(0,0,0,0.08)_100%)]') : 'bg-black/10'}`} />
                   </div>
                 </motion.div>
                 <motion.div
@@ -956,13 +1008,13 @@ export function Screen({
                   animate={{ opacity: shadowOpacity }}
                   transition={{ duration: shouldReduceMotion ? 0 : 0.16 }}
                 >
-                  <div className="relative h-full w-full overflow-hidden rounded-[2px] bg-neutral-300">
+                  <div className={`relative h-full w-full overflow-hidden rounded-[2px] ${isDarkTheme ? 'bg-[#2b2225]' : 'bg-neutral-300'}`}>
                     {renderCoverArtwork(album, false)}
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-white/65 to-white" />
+                    <div className={`absolute inset-0 ${isDarkTheme ? 'bg-gradient-to-b from-black/10 via-black/65 to-[#090707]' : 'bg-gradient-to-b from-white/10 via-white/65 to-white'}`} />
                   </div>
                 </motion.div>
                 {absDistance < 0.08 && (
-                  <div className="absolute -inset-1 rounded-[4px] border border-black/10 pointer-events-none" />
+                  <div className={`absolute -inset-1 rounded-[4px] border pointer-events-none ${isDarkTheme ? 'border-[#e01830]/35' : 'border-black/10'}`} />
                 )}
               </div>
             );
@@ -971,13 +1023,13 @@ export function Screen({
 
         <motion.div
           key={displayAlbum.id}
-          className="absolute inset-x-7 bottom-0 z-[160] px-3 py-2 text-center [text-shadow:0_1px_1px_rgba(255,255,255,0.75)]"
+          className={`absolute inset-x-7 bottom-0 z-[160] px-3 py-2 text-center ${isDarkTheme ? '[text-shadow:0_1px_1px_rgba(0,0,0,0.75)]' : '[text-shadow:0_1px_1px_rgba(255,255,255,0.75)]'}`}
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.16 }}
         >
-          <div className="truncate text-[15px] font-black leading-tight text-neutral-950">{displayAlbum.title}</div>
-          <div className="mt-1 truncate text-[11px] font-bold leading-tight text-neutral-700">{artist}</div>
+          <div className={`truncate text-[15px] font-black leading-tight ${isDarkTheme ? 'text-[#f7efed]' : 'text-neutral-950'}`}>{displayAlbum.title}</div>
+          <div className={`mt-1 truncate text-[11px] font-bold leading-tight ${isDarkTheme ? 'text-[#b9a6aa]' : 'text-neutral-700'}`}>{artist}</div>
         </motion.div>
       </div>
     );
@@ -994,10 +1046,10 @@ export function Screen({
     
     return (
       <div className="flex-1 flex w-full relative">
-        <div className="w-1/2 h-full flex flex-col border-r border-gray-300 bg-white">
+        <div className={leftPaneClass}>
           <div className="flex-grow flex flex-col pt-2 relative overflow-hidden">
              <motion.div
-               className="absolute left-0 right-0 h-[32px] bg-gradient-to-b from-blue-400 to-blue-600 shadow-sm z-0"
+               className={`absolute left-0 right-0 h-[32px] z-0 ${accentSelectionClass}`}
                animate={{ y: (cursorIndex - scrollStart) * rowHeight }}
                transition={{ type: "spring", stiffness: 450, damping: 40 }}
              />
@@ -1014,31 +1066,31 @@ export function Screen({
                  const showSection = section?.startIndex === idx;
                  return (
                    <div 
-                      key={child.id} 
+                     key={child.id} 
 	                      className={`relative h-[32px] px-4 flex justify-between items-center bg-transparent ${child.reorderActive ? 'ring-2 ring-inset ring-amber-300' : ''}`}
 	                   >
                      {showSection && !isSelected && (
-                       <span className="absolute left-1 top-1 z-10 text-[9px] font-black leading-none text-blue-500/80">
+                       <span className={`absolute left-1 top-1 z-10 text-[9px] font-black leading-none ${sectionMarkerClass}`}>
                          {section.key}
                        </span>
                      )}
-	                     <span className={`relative min-w-0 text-sm font-bold truncate z-10 transition-colors duration-150 ${isSelected ? 'text-white' : 'text-gray-800'}`}>
+	                     <span className={`relative min-w-0 text-sm font-bold truncate z-10 transition-colors duration-150 ${isSelected ? selectedTextClass : unselectedMenuTextClass}`}>
 	                       {child.title}
 	                     </span>
                      {hasSwitch && (
                        <div className="relative z-10 ml-2">
-                         <AppleSwitch checked={Boolean(child.switchValue)} selected={isSelected} />
+                         <AppleSwitch checked={Boolean(child.switchValue)} selected={isSelected} theme={theme} />
                        </div>
                      )}
                      {child.isLoading && (
                        <motion.span
-                         className={`relative h-3 w-3 shrink-0 rounded-full border-2 z-10 ${isSelected ? 'border-white/50 border-t-white' : 'border-gray-300 border-t-blue-500'}`}
+                         className={`relative h-3 w-3 shrink-0 rounded-full border-2 z-10 ${isSelected ? 'border-white/50 border-t-white' : spinnerIdleClass}`}
                          animate={{ rotate: 360 }}
                          transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
                        />
                      )}
                      {!hasSwitch && !child.isLoading && child.type === 'menu' && (
-                       <span className={`relative text-[10px] font-bold pl-2 z-10 transition-colors duration-150 ${isSelected ? 'text-white' : 'text-gray-400'}`}>
+                       <span className={`relative text-[10px] font-bold pl-2 z-10 transition-colors duration-150 ${isSelected ? selectedTextClass : unselectedMenuMetaClass}`}>
                          &gt;
                        </span>
                      )}
@@ -1055,8 +1107,10 @@ export function Screen({
     );
   };
 
-  const inputClass = 'w-full rounded-sm border border-neutral-300 bg-white px-2 py-1.5 text-[12px] font-semibold leading-tight text-neutral-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200';
-  const labelClass = 'text-[9px] font-black uppercase tracking-wide text-neutral-500';
+  const inputClass = isDarkTheme
+    ? 'w-full rounded-sm border border-[#4a383d] bg-[#110d0f] px-2 py-1.5 text-[12px] font-semibold leading-tight text-[#f4eeee] outline-none placeholder:text-[#6f5e63] focus:border-[#d6001c] focus:ring-2 focus:ring-[#d6001c]/25'
+    : 'w-full rounded-sm border border-neutral-300 bg-white px-2 py-1.5 text-[12px] font-semibold leading-tight text-neutral-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200';
+  const labelClass = `text-[9px] font-black uppercase tracking-wide ${mutedTextClass}`;
 
   const renderTextField = (
     field: keyof TextEditorState['fields'],
@@ -1109,7 +1163,7 @@ export function Screen({
 
     return (
       <form
-        className="flex-1 bg-neutral-50 p-3 overflow-y-auto"
+        className={`flex-1 p-3 overflow-y-auto ${mainSurfaceClass}`}
         onSubmit={event => {
           event.preventDefault();
           onTextEditorSave();
@@ -1117,12 +1171,12 @@ export function Screen({
       >
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <div className="truncate text-[15px] font-black leading-tight text-neutral-950">{title}</div>
-            <div className="text-[9px] font-bold uppercase text-neutral-500">{t(locale, 'menuCancelsSelectSaves')}</div>
+            <div className={`truncate text-[15px] font-black leading-tight ${strongTextClass}`}>{title}</div>
+            <div className={`text-[9px] font-bold uppercase ${mutedTextClass}`}>{t(locale, 'menuCancelsSelectSaves')}</div>
           </div>
           <div className="flex shrink-0 gap-1">
-            <button type="button" className="rounded-sm border border-neutral-300 bg-white px-2 py-1 text-[10px] font-black text-neutral-700" onClick={onTextEditorCancel}>{t(locale, 'cancel')}</button>
-            <button type="submit" className="rounded-sm bg-blue-600 px-2 py-1 text-[10px] font-black text-white">{t(locale, 'save')}</button>
+            <button type="button" className={`rounded-sm border px-2 py-1 text-[10px] font-black ${isDarkTheme ? 'border-[#4a383d] bg-[#110d0f] text-[#d4c7ca]' : 'border-neutral-300 bg-white text-neutral-700'}`} onClick={onTextEditorCancel}>{t(locale, 'cancel')}</button>
+            <button type="submit" className={`rounded-sm px-2 py-1 text-[10px] font-black text-white ${accentButtonClass}`}>{t(locale, 'save')}</button>
           </div>
         </div>
 
@@ -1169,7 +1223,7 @@ export function Screen({
         </div>
 
         {textEditor.error && (
-          <div className="mt-3 rounded-sm border border-red-200 bg-red-50 px-2 py-1.5 text-[11px] font-bold leading-tight text-red-700">
+          <div className={`mt-3 rounded-sm border px-2 py-1.5 text-[11px] font-bold leading-tight ${isDarkTheme ? 'border-[#7d1d2a] bg-[#2a1115] text-[#ff9aa7]' : 'border-red-200 bg-red-50 text-red-700'}`}>
             {textEditor.error}
           </div>
         )}
@@ -1190,8 +1244,8 @@ export function Screen({
         : sleepTimer.status === 'completed' ? tx(locale, 'Done', '完成') : t(locale, 'off');
 
       return (
-        <div className="flex-1 bg-neutral-950 text-white flex flex-col justify-center px-6">
-          <div className="text-[10px] font-black uppercase text-white/55">{tx(locale, 'Sleep Timer', '睡眠定时')}</div>
+        <div className={`flex-1 text-white flex flex-col justify-center px-6 ${isDarkTheme ? 'bg-[#0c090a]' : 'bg-neutral-950'}`}>
+          <div className={`text-[10px] font-black uppercase ${isDarkTheme ? 'text-[#e01830]' : 'text-white/55'}`}>{tx(locale, 'Sleep Timer', '睡眠定时')}</div>
           <div className="mt-2 text-4xl font-black leading-none tabular-nums">{formatted}</div>
           <div className="mt-4 space-y-1">
             {(currentNode.detailLines || []).map((line, index) => (
@@ -1236,22 +1290,22 @@ export function Screen({
     const secondDegrees = second * 6;
 
     return (
-      <div className="flex-1 bg-neutral-100 flex flex-col items-center justify-center relative overflow-hidden">
-        <div className="w-32 h-32 rounded-full border-[8px] border-gray-400 bg-white relative flex items-center justify-center shadow-inner">
-          <div className="absolute top-2 w-1 h-3 bg-gray-300"></div>
-          <div className="absolute bottom-2 w-1 h-3 bg-gray-300"></div>
-          <div className="absolute left-2 w-3 h-1 bg-gray-300"></div>
-          <div className="absolute right-2 w-3 h-1 bg-gray-300"></div>
+      <div className={`flex-1 flex flex-col items-center justify-center relative overflow-hidden ${isDarkTheme ? 'bg-[#171314]' : 'bg-neutral-100'}`}>
+        <div className={`w-32 h-32 rounded-full border-[8px] relative flex items-center justify-center shadow-inner ${isDarkTheme ? 'border-[#4a383d] bg-[#0d0a0b]' : 'border-gray-400 bg-white'}`}>
+          <div className={`absolute top-2 w-1 h-3 ${isDarkTheme ? 'bg-[#6f5e63]' : 'bg-gray-300'}`}></div>
+          <div className={`absolute bottom-2 w-1 h-3 ${isDarkTheme ? 'bg-[#6f5e63]' : 'bg-gray-300'}`}></div>
+          <div className={`absolute left-2 w-3 h-1 ${isDarkTheme ? 'bg-[#6f5e63]' : 'bg-gray-300'}`}></div>
+          <div className={`absolute right-2 w-3 h-1 ${isDarkTheme ? 'bg-[#6f5e63]' : 'bg-gray-300'}`}></div>
           
           {/* Hands */}
-          <div className="w-1.5 h-8 bg-gray-800 absolute bottom-1/2 left-1/2 -mb-0.5 -ml-[3px] origin-bottom rounded-full" style={{ transform: `rotate(${hourDegrees}deg)` }}></div>
-          <div className="w-1 h-12 bg-gray-800 absolute bottom-1/2 left-1/2 -mb-0.5 -ml-0.5 origin-bottom rounded-full" style={{ transform: `rotate(${minuteDegrees}deg)` }}></div>
-          <div className="w-0.5 h-14 bg-red-500 absolute bottom-1/2 left-1/2 -mb-0.5 -ml-[1px] origin-bottom" style={{ transform: `rotate(${secondDegrees}deg)` }}></div>
+          <div className={`w-1.5 h-8 absolute bottom-1/2 left-1/2 -mb-0.5 -ml-[3px] origin-bottom rounded-full ${isDarkTheme ? 'bg-[#efe7e4]' : 'bg-gray-800'}`} style={{ transform: `rotate(${hourDegrees}deg)` }}></div>
+          <div className={`w-1 h-12 absolute bottom-1/2 left-1/2 -mb-0.5 -ml-0.5 origin-bottom rounded-full ${isDarkTheme ? 'bg-[#efe7e4]' : 'bg-gray-800'}`} style={{ transform: `rotate(${minuteDegrees}deg)` }}></div>
+          <div className={`w-0.5 h-14 absolute bottom-1/2 left-1/2 -mb-0.5 -ml-[1px] origin-bottom ${accentFillClass}`} style={{ transform: `rotate(${secondDegrees}deg)` }}></div>
           
-          <div className="w-3 h-3 bg-gray-800 rounded-full z-10 absolute"></div>
+          <div className={`w-3 h-3 rounded-full z-10 absolute ${isDarkTheme ? 'bg-[#e01830]' : 'bg-gray-800'}`}></div>
         </div>
-        <div className="mt-8 text-xl font-bold text-gray-800 font-sans tracking-tight">{formattedTime}</div>
-        <div className="text-xs font-semibold text-gray-500">{currentNode.title || 'Clock'}</div>
+        <div className={`mt-8 text-xl font-bold font-sans tracking-tight ${primaryTextClass}`}>{formattedTime}</div>
+        <div className={`text-xs font-semibold ${mutedTextClass}`}>{currentNode.title || 'Clock'}</div>
       </div>
     );
   };
@@ -1278,11 +1332,11 @@ export function Screen({
     ];
 
     return (
-      <div className="flex-1 bg-white flex flex-col p-2">
-        <div className="text-center font-bold text-sm bg-blue-500 text-white py-1 rounded-sm shadow-sm mb-2">{monthTitle}</div>
+      <div className={`flex-1 flex flex-col p-2 ${isDarkTheme ? 'bg-[#171314]' : 'bg-white'}`}>
+        <div className={`text-center font-bold text-sm text-white py-1 rounded-sm shadow-sm mb-2 ${accentFillClass}`}>{monthTitle}</div>
         <div className="grid grid-cols-7 gap-1 flex-1">
           {t(locale, 'weekdaysShort').split(',').map((d, i) => (
-            <div key={i} className="text-center text-[10px] font-bold text-gray-400">{d}</div>
+            <div key={i} className={`text-center text-[10px] font-bold ${faintTextClass}`}>{d}</div>
           ))}
           {cells.map((day, index) => {
             const dateKey = day
@@ -1290,10 +1344,10 @@ export function Screen({
               : '';
             const hasEvent = eventDates.has(dateKey);
             return (
-              <div key={`${day}-${index}`} className={`relative text-center text-xs font-bold py-1 ${day === today ? 'bg-blue-100 border border-blue-500 text-blue-800 shadow-sm rounded-sm z-10' : 'text-gray-800'}`}>
+              <div key={`${day}-${index}`} className={`relative text-center text-xs font-bold py-1 ${day === today ? (isDarkTheme ? 'bg-[#351419] border border-[#d6001c] text-[#fff2f0] shadow-sm rounded-sm z-10' : 'bg-blue-100 border border-blue-500 text-blue-800 shadow-sm rounded-sm z-10') : (isDarkTheme ? 'text-[#ded4d2]' : 'text-gray-800')}`}>
                 {day || ''}
                 {hasEvent && (
-                  <span className="absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-blue-600" />
+                  <span className={`absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${accentButtonClass}`} />
                 )}
               </div>
             );
@@ -1327,29 +1381,29 @@ export function Screen({
     };
 
     return (
-       <div className="flex-1 bg-neutral-100 flex flex-col p-5">
+       <div className={`flex-1 flex flex-col p-5 ${isDarkTheme ? 'bg-[#171314]' : 'bg-neutral-100'}`}>
          <div className="flex items-center justify-between">
-           <div className="text-[10px] font-black uppercase text-gray-500">{stopwatchRunning ? t(locale, 'running') : stopwatchElapsedMs > 0 ? tx(locale, 'Paused', '已暂停') : t(locale, 'stopped')}</div>
-           <div className={`h-2 w-2 rounded-full ${stopwatchRunning ? 'bg-red-500' : 'bg-gray-400'}`} />
+           <div className={`text-[10px] font-black uppercase ${mutedTextClass}`}>{stopwatchRunning ? t(locale, 'running') : stopwatchElapsedMs > 0 ? tx(locale, 'Paused', '已暂停') : t(locale, 'stopped')}</div>
+           <div className={`h-2 w-2 rounded-full ${stopwatchRunning ? accentFillClass : isDarkTheme ? 'bg-[#6f5e63]' : 'bg-gray-400'}`} />
          </div>
-         <div className="mt-2 text-4xl font-black font-mono tracking-tighter text-gray-900 tabular-nums">{formatted}</div>
+         <div className={`mt-2 text-4xl font-black font-mono tracking-tighter tabular-nums ${strongTextClass}`}>{formatted}</div>
          <div className="mt-4 min-h-[82px] space-y-1 overflow-hidden">
            {lapRows.length ? lapRows.map(lap => (
-             <div key={lap.index} className="flex justify-between border-b border-gray-200 pb-1 text-[11px] font-black tabular-nums text-gray-700">
+             <div key={lap.index} className={`flex justify-between border-b pb-1 text-[11px] font-black tabular-nums ${dividerClass} ${secondaryTextClass}`}>
                <span>{tx(locale, 'Lap {count}', '计圈 {count}', { count: String(lap.index).padStart(2, '0') })}</span>
                <span>{formatMs(lap.split)}</span>
              </div>
            )) : stopwatchLastSession ? (
-             <div className="space-y-1 text-[11px] font-bold text-gray-600">
-               <div className="font-black text-gray-900">{tx(locale, 'Last Session', '上次记录')}</div>
+             <div className={`space-y-1 text-[11px] font-bold ${mutedTextClass}`}>
+               <div className={`font-black ${strongTextClass}`}>{tx(locale, 'Last Session', '上次记录')}</div>
                <div>{tx(locale, 'Total {value}', '总计 {value}', { value: formatMs(stopwatchLastSession.totalMs) })}</div>
                <div>{tx(locale, '{count} laps', '{count} 圈', { count: stopwatchLastSession.laps.length })}</div>
              </div>
            ) : (
-             <div className="text-[11px] font-bold leading-tight text-gray-500">{tx(locale, 'Select starts. Next records a lap. Pause first, then Previous resets.', 'Select 开始。Next 记录一圈。先暂停，再用 Previous 重置。')}</div>
+             <div className={`text-[11px] font-bold leading-tight ${mutedTextClass}`}>{tx(locale, 'Select starts. Next records a lap. Pause first, then Previous resets.', 'Select 开始。Next 记录一圈。先暂停，再用 Previous 重置。')}</div>
            )}
          </div>
-         <div className="mt-auto grid grid-cols-3 gap-1 text-center text-[9px] font-black uppercase text-gray-500">
+         <div className={`mt-auto grid grid-cols-3 gap-1 text-center text-[9px] font-black uppercase ${mutedTextClass}`}>
            <div>{tx(locale, 'Select {action}', 'Select {action}', { action: stopwatchRunning ? tx(locale, 'Pause', '暂停') : tx(locale, 'Start', '开始') })}</div>
            <div>{tx(locale, 'Next Lap', 'Next 计圈')}</div>
            <div>{tx(locale, 'Prev Reset', 'Prev 重置')}</div>
@@ -1361,15 +1415,15 @@ export function Screen({
   const renderAbout = () => {
      const lines = currentNode.detailLines || [];
      return (
-       <div className="flex-1 bg-white flex flex-col p-4">
-          <div className="font-bold text-lg mb-4 text-center">SquarePod</div>
+       <div className={`flex-1 flex flex-col p-4 ${isDarkTheme ? 'bg-[#171314]' : 'bg-white'}`}>
+          <div className={`font-bold text-lg mb-4 text-center ${strongTextClass}`}>SquarePod</div>
           <div className="space-y-2 align-middle">
             {lines.map(line => {
               const [label, ...valueParts] = line.split(':');
               return (
-                <div key={line} className="flex border-b border-gray-100 pb-1 justify-between gap-3 text-xs font-bold">
-                  <span className="text-gray-500">{label}</span>
-                  <span className="text-right">{valueParts.join(':').trim() || '-'}</span>
+                <div key={line} className={`flex border-b pb-1 justify-between gap-3 text-xs font-bold ${isDarkTheme ? 'border-[#2b2023]' : 'border-gray-100'}`}>
+                  <span className={mutedTextClass}>{label}</span>
+                  <span className={`text-right ${primaryTextClass}`}>{valueParts.join(':').trim() || '-'}</span>
                 </div>
               );
             })}
@@ -1380,31 +1434,31 @@ export function Screen({
 
   const renderPlaceholder = () => {
      return (
-       <div className="flex-1 flex flex-col items-center justify-center bg-white p-6 text-center">
-         <svg className="w-12 h-12 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+       <div className={`flex-1 flex flex-col items-center justify-center p-6 text-center ${isDarkTheme ? 'bg-[#171314]' : 'bg-white'}`}>
+         <svg className={`w-12 h-12 mb-4 ${isDarkTheme ? 'text-[#4a383d]' : 'text-gray-300'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
          </svg>
-         <div className="text-gray-500 font-bold text-sm tracking-tight">{t(locale, 'notImplemented')}</div>
-         <div className="text-gray-400 text-xs mt-1 leading-tight">{t(locale, 'mockupFeature')}</div>
+         <div className={`font-bold text-sm tracking-tight ${mutedTextClass}`}>{t(locale, 'notImplemented')}</div>
+         <div className={`text-xs mt-1 leading-tight ${faintTextClass}`}>{t(locale, 'mockupFeature')}</div>
        </div>
      );
   };
 
   const renderServiceStatus = () => {
     const toneClass = currentNode.statusTone === 'success'
-      ? 'text-green-600'
+      ? isDarkTheme ? 'text-[#68d391]' : 'text-green-600'
       : currentNode.statusTone === 'error'
-        ? 'text-red-600'
+        ? isDarkTheme ? 'text-[#ff7a8b]' : 'text-red-600'
         : currentNode.statusTone === 'warning'
-          ? 'text-amber-600'
-          : 'text-gray-600';
+          ? isDarkTheme ? 'text-[#f0b45f]' : 'text-amber-600'
+          : isDarkTheme ? 'text-[#d6cacc]' : 'text-gray-600';
 
     return (
-      <div className="flex-1 bg-white flex flex-col p-5 overflow-hidden">
+      <div className={`flex-1 flex flex-col p-5 overflow-hidden ${isDarkTheme ? 'bg-[#171314]' : 'bg-white'}`}>
         <div className={`text-sm font-bold leading-tight ${toneClass}`}>{currentNode.title}</div>
         <div className="mt-3 space-y-2">
           {(currentNode.detailLines || [t(locale, 'noServiceDetails')]).map((line, index) => (
-            <div key={`${line}-${index}`} className="text-[11px] leading-tight font-semibold text-gray-700">
+            <div key={`${line}-${index}`} className={`text-[11px] leading-tight font-semibold ${secondaryTextClass}`}>
               {line}
             </div>
           ))}
@@ -1442,7 +1496,7 @@ export function Screen({
                 decoding="async"
               />
               {isSelected && (
-                <div className="pointer-events-none absolute inset-0 z-10 rounded-[2px] border-[3px] border-blue-500 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.92),0_0_0_1px_rgba(0,0,0,0.65)]" />
+                <div className={`pointer-events-none absolute inset-0 z-10 rounded-[2px] border-[3px] ${isDarkTheme ? 'border-[#d6001c]' : 'border-blue-500'} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.92),0_0_0_1px_rgba(0,0,0,0.65)]`} />
               )}
             </div>
           );
@@ -1517,10 +1571,10 @@ export function Screen({
       : lines[0];
 
     return (
-      <div className="flex-1 bg-neutral-100 flex flex-col items-center justify-center px-6 text-center">
+      <div className={`flex-1 flex flex-col items-center justify-center px-6 text-center ${isDarkTheme ? 'bg-[#171314]' : 'bg-neutral-100'}`}>
         <div className="relative h-24 w-36 rounded-sm border-4 border-neutral-700 bg-neutral-900 shadow-inner">
           <div className="absolute inset-x-4 top-5 h-2 rounded-full bg-neutral-700">
-            <div className="h-full w-1 rounded-full bg-red-500" style={{ marginLeft: '56%' }} />
+            <div className={`h-full w-1 rounded-full ${accentFillClass}`} style={{ marginLeft: '56%' }} />
           </div>
           <div className="absolute inset-x-4 bottom-5 flex items-end gap-1">
             {[0.45, 0.72, 0.32, 0.86, 0.54].map((height, index) => (
@@ -1528,10 +1582,10 @@ export function Screen({
             ))}
           </div>
         </div>
-        <div className="mt-5 text-xl font-black leading-none text-neutral-900">{frequencyLine}</div>
+        <div className={`mt-5 text-xl font-black leading-none ${strongTextClass}`}>{frequencyLine}</div>
         <div className="mt-3 space-y-1">
           {lines.slice(0, 4).map((line, index) => (
-            <div key={`${line}-${index}`} className="text-[11px] font-bold leading-tight text-neutral-600">{line}</div>
+            <div key={`${line}-${index}`} className={`text-[11px] font-bold leading-tight ${mutedTextClass}`}>{line}</div>
           ))}
         </div>
       </div>
@@ -1539,15 +1593,15 @@ export function Screen({
   };
 
   const renderDetailLinesScreen = () => (
-    <div className="flex-1 bg-white flex flex-col p-5 overflow-y-auto">
-      <div className="text-lg font-black leading-tight text-neutral-900">{currentNode.title}</div>
+    <div className={`flex-1 flex flex-col p-5 overflow-y-auto ${isDarkTheme ? 'bg-[#171314]' : 'bg-white'}`}>
+      <div className={`text-lg font-black leading-tight ${strongTextClass}`}>{currentNode.title}</div>
       <div className="mt-4 space-y-3">
         {(currentNode.detailLines || []).map((line, index) => (
-          <div key={`${line}-${index}`} className="whitespace-pre-wrap text-xs font-semibold leading-tight text-neutral-700">{line}</div>
+          <div key={`${line}-${index}`} className={`whitespace-pre-wrap text-xs font-semibold leading-tight ${secondaryTextClass}`}>{line}</div>
         ))}
       </div>
       {currentNode.children?.length ? (
-        <div className="mt-auto text-[10px] font-black uppercase text-neutral-500">{t(locale, 'actions')}</div>
+        <div className={`mt-auto text-[10px] font-black uppercase ${mutedTextClass}`}>{t(locale, 'actions')}</div>
       ) : null}
     </div>
   );
@@ -1602,6 +1656,7 @@ export function Screen({
             command={ebookReaderCommand}
             locale={locale}
             onEbookProgress={onEbookProgress}
+            theme={theme}
           />
         );
       case 'textEditor': return renderTextEditor();
@@ -1624,7 +1679,7 @@ export function Screen({
   const usesFullScreenMedia = currentNode.type === 'photoDetail';
 
   return (
-    <div className="relative w-full h-full bg-white border-[4px] border-neutral-900 rounded-[36px] shadow-inner flex flex-col overflow-hidden">
+    <div className={screenRootClass}>
       {!usesFullScreenMedia && renderHeader()}
       <div className={`w-full ${usesFullScreenMedia ? 'h-full' : 'h-[calc(100%-24px)]'} min-h-0 overflow-hidden flex`}>
         {renderScreenContent()}

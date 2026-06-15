@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppTheme } from '../types';
 import { RotateEndMeta, useWheel } from '../useWheel';
 import { playOuterButtonClick, playSelectClick, playWheelTick, unlockUiAudio } from '../audio/uiSounds';
 import { WheelHaptics } from '../native/wheelHaptics';
@@ -37,6 +38,7 @@ interface ClickWheelProps {
   onPrevLongPress?: () => void;
   onRotateStart?: () => void;
   onRotateEnd?: (meta: RotateEndMeta) => void;
+  theme?: AppTheme;
 }
 
 export function ClickWheel({
@@ -50,7 +52,9 @@ export function ClickWheel({
   onPrevLongPress,
   onRotateStart,
   onRotateEnd,
+  theme = 'light',
 }: ClickWheelProps) {
+  const isDarkTheme = theme === 'dark';
   const pendingOuterButtonSoundRef = React.useRef<number | null>(null);
   const longPressStartRef = React.useRef<number | null>(null);
   const longPressRepeatRef = React.useRef<number | null>(null);
@@ -193,6 +197,17 @@ export function ClickWheel({
     };
   }, []);
 
+  const wheelClass = isDarkTheme
+    ? 'h-[calc(100%+7px)] max-h-[343px] aspect-square rounded-full border border-[#70000e] bg-[linear-gradient(180deg,#e1132d_0%,#cf001d_46%,#a90017_100%)] shadow-[0_18px_30px_rgba(0,0,0,0.58),inset_0_2px_3px_rgba(255,255,255,0.22),inset_0_-10px_18px_rgba(72,0,8,0.42)] flex items-center justify-center relative touch-none pointer-events-auto cursor-pointer'
+    : 'h-[calc(100%+7px)] max-h-[343px] aspect-square rounded-full bg-white shadow-[0_10px_20px_rgba(0,0,0,0.1),inset_0_1px_4px_rgba(0,0,0,0.1)] border border-gray-100 flex items-center justify-center relative touch-none pointer-events-auto cursor-pointer';
+  const wheelLabelClass = isDarkTheme ? 'text-[#050303]' : 'text-[#9CA3AF]';
+  const selectVisualClass = isDarkTheme
+    ? 'absolute left-1/2 top-1/2 z-10 h-[35%] w-[35%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#3a3032] bg-[linear-gradient(180deg,#242022_0%,#111011_100%)] shadow-[0_3px_6px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.12)] pointer-events-none'
+    : 'absolute left-1/2 top-1/2 z-10 h-[35%] w-[35%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-gray-400 bg-gradient-to-b from-gray-100 to-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.15)] pointer-events-none';
+  const selectButtonClass = isDarkTheme
+    ? 'absolute left-1/2 top-1/2 z-20 h-[24%] w-[24%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent cursor-pointer pointer-events-auto outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d6001c]/70'
+    : 'absolute left-1/2 top-1/2 z-20 h-[24%] w-[24%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent cursor-pointer pointer-events-auto outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/40';
+
   return (
     <div className="relative w-full h-full flex items-center justify-center select-none" style={{ touchAction: 'none' }}>
       <div 
@@ -201,14 +216,14 @@ export function ClickWheel({
         onPointerMove={handleWheelPointerMove}
         onPointerUp={handleWheelPointerUp}
         onPointerCancel={handleWheelPointerCancel}
-        className="h-[calc(100%+7px)] max-h-[343px] aspect-square rounded-full bg-white shadow-[0_10px_20px_rgba(0,0,0,0.1),inset_0_1px_4px_rgba(0,0,0,0.1)] border border-gray-100 flex items-center justify-center relative touch-none pointer-events-auto cursor-pointer"
+        className={wheelClass}
       >
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-[30%] flex justify-center items-start pt-[15%] text-[#9CA3AF] font-bold text-sm tracking-[0.15em] uppercase pointer-events-none">
+        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-[30%] flex justify-center items-start pt-[15%] ${wheelLabelClass} font-bold text-sm tracking-[0.15em] uppercase pointer-events-none`}>
           MENU
         </div>
 
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-[30%] flex justify-center items-end pb-[15%] pointer-events-none">
-          <svg width="22" height="11" viewBox="0 0 22 11" fill="currentColor" className="text-[#9CA3AF]">
+          <svg width="22" height="11" viewBox="0 0 22 11" fill="currentColor" className={wheelLabelClass}>
              {/* Play */}
              <path d="M0 0l9 5.5L0 11z" />
              {/* Pause */}
@@ -217,22 +232,22 @@ export function ClickWheel({
         </div>
 
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[30%] h-1/2 flex justify-start pl-[15%] pointer-events-none items-center">
-          <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor" className="text-[#9CA3AF]">
+          <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor" className={wheelLabelClass}>
              <path d="M0 0h2.5v11H0zM15 0L6 5.5 15 11z" />
           </svg>
         </div>
 
         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[30%] h-1/2 flex justify-end pr-[15%] pointer-events-none items-center">
-          <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor" className="text-[#9CA3AF]">
+          <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor" className={wheelLabelClass}>
              <path d="M0 0l9 5.5L0 11zM12.5 0H15v11h-2.5z" />
           </svg>
         </div>
 
         {/* Center Select visual stays large; the transparent hit target is smaller to avoid stealing outer-button taps. */}
-        <div className="absolute left-1/2 top-1/2 z-10 h-[35%] w-[35%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-gray-400 bg-gradient-to-b from-gray-100 to-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.15)] pointer-events-none" />
+        <div className={selectVisualClass} />
         <button 
           aria-label="Select"
-          className="absolute left-1/2 top-1/2 z-20 h-[24%] w-[24%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent cursor-pointer pointer-events-auto"
+          className={selectButtonClass}
           onPointerDown={handleSelectPointerDown}
           onClick={onSelect}
         />

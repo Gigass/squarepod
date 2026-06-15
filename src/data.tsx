@@ -1,4 +1,4 @@
-import { DeviceMode, Song, MenuNode, PlaybackMode, SleepTimerEndAction } from './types';
+import { AppTheme, DeviceMode, Song, MenuNode, PlaybackMode, SleepTimerEndAction } from './types';
 import React from 'react';
 import { Activity, BookOpen, Mic, PlayCircle, Film, Image as ImageIcon, Radio as RadioIcon, Settings, Shuffle, Clock, FileText, Calendar, Info, Volume2, RefreshCw, RotateCcw } from 'lucide-react';
 import { LocalMusicSourceMode, LocalMusicTrack, LocalMusicTrackSource } from './native/localMusic';
@@ -157,6 +157,7 @@ export interface LocalMusicMenuState {
   compilationsEnabled?: boolean;
   language?: Locale;
   deviceMode?: DeviceMode;
+  theme?: AppTheme;
 }
 
 export interface ContactEntry {
@@ -1708,6 +1709,10 @@ const deviceModeLabel = (mode: DeviceMode | undefined, locale: Locale) => {
   return touch ? tx(locale, 'iPod nano 6 Touch', 'iPod nano 6 触摸') : tx(locale, 'Click Wheel', '滚轮');
 };
 
+const themeLabel = (theme: AppTheme | undefined, locale: Locale) => (
+  theme === 'dark' ? tx(locale, 'Dark', '深色') : tx(locale, 'Light', '浅色')
+);
+
 const generateMainMenuSettings = (local: LocalMusicMenuState = {}): MenuNode => {
   const locale = normalizeLocale(local.language);
   const titles: Record<string, string> = {
@@ -2240,6 +2245,20 @@ const generateSettingsMenu = (local: LocalMusicMenuState = {}): MenuNode => {
         title: t(locale, 'interfaceSettings'),
         type: 'menu',
         children: [
+          {
+            id: 'set_theme',
+            title: `${tx(locale, 'Theme', '主题')}: ${themeLabel(local.theme, locale)}`,
+            type: 'localMusicStatus',
+            action: 'settings_toggle_theme',
+            switchValue: local.theme === 'dark',
+            statusTone: 'neutral',
+            detailLines: [
+              `${tx(locale, 'Theme', '主题')}: ${themeLabel(local.theme, locale)}`,
+              local.theme === 'dark'
+                ? tx(locale, 'Classic U2-style black body and red click wheel.', 'Classic U2 风格黑色机身与红色滚轮。')
+                : tx(locale, 'Classic white body and white click wheel.', 'Classic 白色机身与白色滚轮。'),
+            ],
+          },
           {
             id: 'set_click_sound',
             title: `${t(locale, 'clickSound')}: ${formatPercent(local.uiSoundVolume ?? 1)}`,
