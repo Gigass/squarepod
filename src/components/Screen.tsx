@@ -72,7 +72,7 @@ const tx = (locale: Locale | string | undefined, en: string, zhCN: string, value
 
 const AppleSwitch = ({ checked, selected = false, theme = 'light' }: { checked: boolean; selected?: boolean; theme?: AppTheme }) => {
   const isDarkTheme = theme === 'dark';
-  const checkedColor = isDarkTheme ? '#d6001c' : '#22c55e';
+  const checkedColor = isDarkTheme ? '#d92727' : '#22c55e';
   const offColor = isDarkTheme ? '#251b1d' : '#e5e7eb';
   const selectedOffColor = isDarkTheme ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.25)';
   const selectedCheckedColor = isDarkTheme ? '#f4eeea' : '#ffffff';
@@ -81,7 +81,7 @@ const AppleSwitch = ({ checked, selected = false, theme = 'light' }: { checked: 
     <motion.div
       className={`relative h-[18px] w-[32px] shrink-0 rounded-full border shadow-inner ${
         checked
-          ? selected ? 'border-white/70' : isDarkTheme ? 'border-[#d6001c]' : 'border-green-500'
+          ? selected ? 'border-white/70' : isDarkTheme ? 'border-[#d92727]' : 'border-green-500'
           : selected ? 'border-white/60' : isDarkTheme ? 'border-[#554448]' : 'border-gray-300'
       }`}
       animate={{
@@ -92,7 +92,7 @@ const AppleSwitch = ({ checked, selected = false, theme = 'light' }: { checked: 
     >
       <motion.div
         className={`absolute top-[2px] h-[12px] w-[12px] rounded-full shadow-sm ${
-          checked && selected ? (isDarkTheme ? 'bg-[#d6001c]' : 'bg-blue-600') : 'bg-white'
+          checked && selected ? (isDarkTheme ? 'bg-[#d92727]' : 'bg-blue-600') : 'bg-white'
         }`}
         animate={{ x: checked ? 16 : 2 }}
         transition={{ type: 'spring', stiffness: 620, damping: 32 }}
@@ -255,7 +255,7 @@ function ClassicEbookReader({
     <div className={`flex-1 flex flex-col overflow-hidden ${isDarkTheme ? 'bg-[#151112] text-[#eee4df]' : 'bg-[#f3efe3] text-[#211f1a]'}`}>
       <div className={`h-[27px] shrink-0 border-b px-4 flex items-center gap-3 ${isDarkTheme ? 'border-[#3b2d31] bg-[#21191c]' : 'border-[#d7cdb9] bg-[#ebe1cd]'}`}>
         <div className="min-w-0 flex-1 truncate text-[11px] font-black leading-none">{activeChapter?.title || node.title}</div>
-        <div className={`shrink-0 text-[9px] font-black tabular-nums leading-none ${isDarkTheme ? 'text-[#e01830]' : 'text-[#7a6d57]'}`}>{Math.round(readProgress * 100)}%</div>
+        <div className={`shrink-0 text-[9px] font-black tabular-nums leading-none ${isDarkTheme ? 'text-[#df302c]' : 'text-[#7a6d57]'}`}>{Math.round(readProgress * 100)}%</div>
         <div className={`shrink-0 text-[9px] font-black tabular-nums leading-none ${isDarkTheme ? 'text-[#a89499]' : 'text-[#7a6d57]'}`}>{chapterIndex + 1}/{chapters.length}</div>
       </div>
       <div
@@ -352,16 +352,16 @@ export function Screen({
   const secondaryTextClass = isDarkTheme ? 'text-[#c9bbbe]' : 'text-gray-700';
   const mutedTextClass = isDarkTheme ? 'text-[#8f7d82]' : 'text-gray-500';
   const faintTextClass = isDarkTheme ? 'text-[#6f5e63]' : 'text-gray-400';
-  const accentTextClass = isDarkTheme ? 'text-[#e01830]' : 'text-blue-600';
-  const accentFillClass = isDarkTheme ? 'bg-[#d6001c]' : 'bg-blue-500';
-  const accentButtonClass = isDarkTheme ? 'bg-[#d6001c]' : 'bg-blue-600';
+  const accentTextClass = isDarkTheme ? 'text-[#df302c]' : 'text-blue-600';
+  const accentFillClass = isDarkTheme ? 'bg-[#d92727]' : 'bg-blue-500';
+  const accentButtonClass = isDarkTheme ? 'bg-[#d92727]' : 'bg-blue-600';
   const accentSelectionClass = isDarkTheme
-    ? 'bg-[linear-gradient(180deg,#e01830_0%,#ca001b_58%,#980014_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_3px_rgba(0,0,0,0.5)]'
+    ? 'bg-[linear-gradient(180deg,#df302c_0%,#d92727_58%,#c91f22_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_1px_3px_rgba(0,0,0,0.42)]'
     : 'bg-gradient-to-b from-blue-400 to-blue-600 shadow-sm';
   const progressTrackClass = isDarkTheme ? 'bg-[#35272b]' : 'bg-gray-300';
   const loadingTrackClass = isDarkTheme ? 'bg-[#2a2023]' : 'bg-gray-200';
-  const spinnerIdleClass = isDarkTheme ? 'border-[#59464b] border-t-[#d6001c]' : 'border-gray-300 border-t-blue-500';
-  const sectionMarkerClass = isDarkTheme ? 'text-[#e01830]/85' : 'text-blue-500/80';
+  const spinnerIdleClass = isDarkTheme ? 'border-[#59464b] border-t-[#d92727]' : 'border-gray-300 border-t-blue-500';
+  const sectionMarkerClass = isDarkTheme ? 'text-[#df302c]/85' : 'text-blue-500/80';
   const selectedTextClass = 'text-white';
   const unselectedMenuTextClass = isDarkTheme ? 'text-[#e4dcda]' : 'text-gray-800';
   const unselectedMenuMetaClass = isDarkTheme ? 'text-[#806c71]' : 'text-gray-400';
@@ -929,7 +929,7 @@ export function Screen({
     return (
       <div className={`relative flex-1 overflow-hidden ${isDarkTheme ? 'bg-[linear-gradient(180deg,#241b1e_0%,#100d0e_46%,#050404_47%,#181113_100%)]' : 'bg-[linear-gradient(180deg,#f6f6f4_0%,#d9dbdf_46%,#a9adb5_47%,#f3f4f3_100%)]'}`}>
         <div className={`absolute inset-x-0 top-0 h-12 pointer-events-none ${isDarkTheme ? 'bg-gradient-to-b from-white/10 to-transparent' : 'bg-gradient-to-b from-white/65 to-transparent'}`} />
-        <div className={`absolute left-1/2 top-[128px] h-[2px] w-28 -translate-x-1/2 rounded-full blur-[1px] ${isDarkTheme ? 'bg-[#d6001c]/35' : 'bg-black/20'}`} />
+        <div className={`absolute left-1/2 top-[128px] h-[2px] w-28 -translate-x-1/2 rounded-full blur-[1px] ${isDarkTheme ? 'bg-[#d92727]/35' : 'bg-black/20'}`} />
         <div
           className="absolute inset-x-0 top-2 h-[158px]"
           style={{ perspective: 900, transformStyle: 'preserve-3d' }}
@@ -992,7 +992,7 @@ export function Screen({
                   }}
                 >
                   <div
-                    className={`absolute inset-0 h-full w-full overflow-hidden rounded-[2px] ${isDarkTheme ? 'bg-[#2b2225]' : 'bg-neutral-300'} ${absDistance < 0.08 ? (isDarkTheme ? 'shadow-[0_24px_36px_-12px_rgba(0,0,0,0.9)] ring-1 ring-[#e01830]/70' : 'shadow-[0_24px_32px_-14px_rgba(0,0,0,0.72)] ring-1 ring-white/90') : 'shadow-[0_16px_20px_-15px_rgba(0,0,0,0.78)]'}`}
+                    className={`absolute inset-0 h-full w-full overflow-hidden rounded-[2px] ${isDarkTheme ? 'bg-[#2b2225]' : 'bg-neutral-300'} ${absDistance < 0.08 ? (isDarkTheme ? 'shadow-[0_24px_36px_-12px_rgba(0,0,0,0.9)] ring-1 ring-[#d92727]/70' : 'shadow-[0_24px_32px_-14px_rgba(0,0,0,0.72)] ring-1 ring-white/90') : 'shadow-[0_16px_20px_-15px_rgba(0,0,0,0.78)]'}`}
                     style={{
                       backfaceVisibility: 'hidden',
                       WebkitBackfaceVisibility: 'hidden',
@@ -1014,7 +1014,7 @@ export function Screen({
                   </div>
                 </motion.div>
                 {absDistance < 0.08 && (
-                  <div className={`absolute -inset-1 rounded-[4px] border pointer-events-none ${isDarkTheme ? 'border-[#e01830]/35' : 'border-black/10'}`} />
+                  <div className={`absolute -inset-1 rounded-[4px] border pointer-events-none ${isDarkTheme ? 'border-[#d92727]/35' : 'border-black/10'}`} />
                 )}
               </div>
             );
@@ -1108,7 +1108,7 @@ export function Screen({
   };
 
   const inputClass = isDarkTheme
-    ? 'w-full rounded-sm border border-[#4a383d] bg-[#110d0f] px-2 py-1.5 text-[12px] font-semibold leading-tight text-[#f4eeee] outline-none placeholder:text-[#6f5e63] focus:border-[#d6001c] focus:ring-2 focus:ring-[#d6001c]/25'
+    ? 'w-full rounded-sm border border-[#4a383d] bg-[#110d0f] px-2 py-1.5 text-[12px] font-semibold leading-tight text-[#f4eeee] outline-none placeholder:text-[#6f5e63] focus:border-[#d92727] focus:ring-2 focus:ring-[#d92727]/25'
     : 'w-full rounded-sm border border-neutral-300 bg-white px-2 py-1.5 text-[12px] font-semibold leading-tight text-neutral-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200';
   const labelClass = `text-[9px] font-black uppercase tracking-wide ${mutedTextClass}`;
 
@@ -1245,7 +1245,7 @@ export function Screen({
 
       return (
         <div className={`flex-1 text-white flex flex-col justify-center px-6 ${isDarkTheme ? 'bg-[#0c090a]' : 'bg-neutral-950'}`}>
-          <div className={`text-[10px] font-black uppercase ${isDarkTheme ? 'text-[#e01830]' : 'text-white/55'}`}>{tx(locale, 'Sleep Timer', '睡眠定时')}</div>
+          <div className={`text-[10px] font-black uppercase ${isDarkTheme ? 'text-[#df302c]' : 'text-white/55'}`}>{tx(locale, 'Sleep Timer', '睡眠定时')}</div>
           <div className="mt-2 text-4xl font-black leading-none tabular-nums">{formatted}</div>
           <div className="mt-4 space-y-1">
             {(currentNode.detailLines || []).map((line, index) => (
@@ -1302,7 +1302,7 @@ export function Screen({
           <div className={`w-1 h-12 absolute bottom-1/2 left-1/2 -mb-0.5 -ml-0.5 origin-bottom rounded-full ${isDarkTheme ? 'bg-[#efe7e4]' : 'bg-gray-800'}`} style={{ transform: `rotate(${minuteDegrees}deg)` }}></div>
           <div className={`w-0.5 h-14 absolute bottom-1/2 left-1/2 -mb-0.5 -ml-[1px] origin-bottom ${accentFillClass}`} style={{ transform: `rotate(${secondDegrees}deg)` }}></div>
           
-          <div className={`w-3 h-3 rounded-full z-10 absolute ${isDarkTheme ? 'bg-[#e01830]' : 'bg-gray-800'}`}></div>
+          <div className={`w-3 h-3 rounded-full z-10 absolute ${isDarkTheme ? 'bg-[#df302c]' : 'bg-gray-800'}`}></div>
         </div>
         <div className={`mt-8 text-xl font-bold font-sans tracking-tight ${primaryTextClass}`}>{formattedTime}</div>
         <div className={`text-xs font-semibold ${mutedTextClass}`}>{currentNode.title || 'Clock'}</div>
@@ -1344,7 +1344,7 @@ export function Screen({
               : '';
             const hasEvent = eventDates.has(dateKey);
             return (
-              <div key={`${day}-${index}`} className={`relative text-center text-xs font-bold py-1 ${day === today ? (isDarkTheme ? 'bg-[#351419] border border-[#d6001c] text-[#fff2f0] shadow-sm rounded-sm z-10' : 'bg-blue-100 border border-blue-500 text-blue-800 shadow-sm rounded-sm z-10') : (isDarkTheme ? 'text-[#ded4d2]' : 'text-gray-800')}`}>
+              <div key={`${day}-${index}`} className={`relative text-center text-xs font-bold py-1 ${day === today ? (isDarkTheme ? 'bg-[#351419] border border-[#d92727] text-[#fff2f0] shadow-sm rounded-sm z-10' : 'bg-blue-100 border border-blue-500 text-blue-800 shadow-sm rounded-sm z-10') : (isDarkTheme ? 'text-[#ded4d2]' : 'text-gray-800')}`}>
                 {day || ''}
                 {hasEvent && (
                   <span className={`absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${accentButtonClass}`} />
@@ -1496,7 +1496,7 @@ export function Screen({
                 decoding="async"
               />
               {isSelected && (
-                <div className={`pointer-events-none absolute inset-0 z-10 rounded-[2px] border-[3px] ${isDarkTheme ? 'border-[#d6001c]' : 'border-blue-500'} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.92),0_0_0_1px_rgba(0,0,0,0.65)]`} />
+                <div className={`pointer-events-none absolute inset-0 z-10 rounded-[2px] border-[3px] ${isDarkTheme ? 'border-[#d92727]' : 'border-blue-500'} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.92),0_0_0_1px_rgba(0,0,0,0.65)]`} />
               )}
             </div>
           );

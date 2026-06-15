@@ -198,14 +198,14 @@ export function ClickWheel({
   }, []);
 
   const wheelClass = isDarkTheme
-    ? 'h-[calc(100%+7px)] max-h-[343px] aspect-square rounded-full border border-[#70000e] bg-[linear-gradient(180deg,#e1132d_0%,#cf001d_46%,#a90017_100%)] shadow-[0_18px_30px_rgba(0,0,0,0.58),inset_0_2px_3px_rgba(255,255,255,0.22),inset_0_-10px_18px_rgba(72,0,8,0.42)] flex items-center justify-center relative touch-none pointer-events-auto cursor-pointer'
+    ? 'h-[calc(100%+7px)] max-h-[343px] aspect-square rounded-full border border-[#a91518] bg-[linear-gradient(180deg,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0)_38%),linear-gradient(180deg,#df302c_0%,#d92727_52%,#c91f22_100%)] shadow-[0_16px_28px_rgba(0,0,0,0.48),inset_0_1px_1px_rgba(255,255,255,0.16),inset_0_-1px_2px_rgba(85,0,0,0.18)] flex items-center justify-center relative touch-none pointer-events-auto cursor-pointer'
     : 'h-[calc(100%+7px)] max-h-[343px] aspect-square rounded-full bg-white shadow-[0_10px_20px_rgba(0,0,0,0.1),inset_0_1px_4px_rgba(0,0,0,0.1)] border border-gray-100 flex items-center justify-center relative touch-none pointer-events-auto cursor-pointer';
   const wheelLabelClass = isDarkTheme ? 'text-[#050303]' : 'text-[#9CA3AF]';
   const selectVisualClass = isDarkTheme
     ? 'absolute left-1/2 top-1/2 z-10 h-[35%] w-[35%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#3a3032] bg-[linear-gradient(180deg,#242022_0%,#111011_100%)] shadow-[0_3px_6px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.12)] pointer-events-none'
     : 'absolute left-1/2 top-1/2 z-10 h-[35%] w-[35%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-gray-400 bg-gradient-to-b from-gray-100 to-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.15)] pointer-events-none';
   const selectButtonClass = isDarkTheme
-    ? 'absolute left-1/2 top-1/2 z-20 h-[24%] w-[24%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent cursor-pointer pointer-events-auto outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d6001c]/70'
+    ? 'absolute left-1/2 top-1/2 z-20 h-[24%] w-[24%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent cursor-pointer pointer-events-auto outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d92727]/70'
     : 'absolute left-1/2 top-1/2 z-20 h-[24%] w-[24%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent cursor-pointer pointer-events-auto outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/40';
 
   return (
