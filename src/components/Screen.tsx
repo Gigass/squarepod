@@ -52,16 +52,18 @@ interface ScreenProps {
   theme?: AppTheme;
 }
 
-const COVER_FLOW_DRAG_MAX_SPEED = 14;
-const COVER_FLOW_DRAG_FOLLOW_RATE = 16;
-const COVER_FLOW_SETTLE_MAX_SPEED = 4.1;
-const COVER_FLOW_SETTLE_FOLLOW_RATE = 6.4;
-const COVER_FLOW_SETTLE_EPSILON = 0.015;
+const COVER_FLOW_DRAG_MAX_SPEED = 18;
+const COVER_FLOW_DRAG_FOLLOW_RATE = 22;
+const COVER_FLOW_SETTLE_MAX_SPEED = 8.5;
+const COVER_FLOW_SETTLE_FOLLOW_RATE = 9.2;
+const COVER_FLOW_SETTLE_EPSILON = 0.01;
 const COVER_FLOW_RELEASE_MAX_DISTANCE = 1.65;
 const COVER_FLOW_RELEASE_MIN_DISTANCE = 0.62;
 const COVER_FLOW_RELEASE_VELOCITY_FACTOR = 0.22;
 const COVER_FLOW_RELEASE_VELOCITY_EPSILON = 0.15;
-const COVER_FLOW_VISIBLE_RANGE = 4.25;
+const COVER_FLOW_RENDER_COMMIT_MS = 24;
+const COVER_FLOW_RENDER_EPSILON = 0.025;
+const COVER_FLOW_VISIBLE_RANGE = 3.35;
 const PHOTO_GRID_COLUMNS = 4;
 const PHOTO_GRID_VISIBLE_ROWS = 2;
 const EBOOK_WHEEL_SCROLL_PX = 46;
@@ -307,17 +309,19 @@ export function Screen({
   alphaJumpKey,
   theme = 'light',
 }: ScreenProps) {
-  const [coverFlowPosition, setCoverFlowPosition] = useState(cursorIndex);
+  const [coverFlowRenderPosition, setCoverFlowRenderPosition] = useState(cursorIndex);
   const [batteryPercent, setBatteryPercent] = useState<number>();
   const [batteryCharging, setBatteryCharging] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [videoHasStarted, setVideoHasStarted] = useState(false);
   const [videoIsPaused, setVideoIsPaused] = useState(true);
   const coverFlowPositionRef = useRef(cursorIndex);
+  const coverFlowRenderPositionRef = useRef(cursorIndex);
   const coverFlowTargetRef = useRef(cursorIndex);
   const coverFlowMotionModeRef = useRef<'drag' | 'settle'>('settle');
   const coverFlowFrameRef = useRef<number | null>(null);
   const coverFlowLastTimeRef = useRef<number | null>(null);
+  const coverFlowLastCommitTimeRef = useRef(0);
   const coverFlowLastReleaseIdRef = useRef(coverFlowReleaseId);
   const coverFlowPreviousNodeIdRef = useRef<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -366,6 +370,23 @@ export function Screen({
   const unselectedMenuTextClass = isDarkTheme ? 'text-[#e4dcda]' : 'text-gray-800';
   const unselectedMenuMetaClass = isDarkTheme ? 'text-[#806c71]' : 'text-gray-400';
 
+  const commitCoverFlowPosition = React.useCallback((position: number, force = false) => {
+    const nowMs = typeof performance === 'undefined' ? Date.now() : performance.now();
+    const elapsedMs = nowMs - coverFlowLastCommitTimeRef.current;
+    const delta = Math.abs(position - coverFlowRenderPositionRef.current);
+
+    if (!force && (elapsedMs < COVER_FLOW_RENDER_COMMIT_MS || delta < COVER_FLOW_RENDER_EPSILON)) {
+      return;
+    }
+
+    coverFlowRenderPositionRef.current = position;
+    coverFlowLastCommitTimeRef.current = nowMs;
+    setCoverFlowRenderPosition(previous => {
+      if (!force && Math.abs(previous - position) < COVER_FLOW_RENDER_EPSILON) return previous;
+      return position;
+    });
+  }, []);
+
   useEffect(() => {
     const previousNodeId = coverFlowPreviousNodeIdRef.current;
     const enteredCoverFlow = currentNode.type === 'coverFlow' && previousNodeId !== currentNode.id;
@@ -393,7 +414,7 @@ export function Screen({
       coverFlowMotionModeRef.current = 'settle';
       coverFlowLastTimeRef.current = null;
       coverFlowLastReleaseIdRef.current = coverFlowReleaseId;
-      setCoverFlowPosition(cursorIndex);
+      commitCoverFlowPosition(cursorIndex, true);
     }
 
     if (shouldReduceMotion || coverFlowIsSelecting) {
@@ -407,7 +428,7 @@ export function Screen({
       coverFlowLastTimeRef.current = null;
       coverFlowLastReleaseIdRef.current = coverFlowReleaseId;
       coverFlowPreviousNodeIdRef.current = currentNode.id;
-      setCoverFlowPosition(cursorIndex);
+      commitCoverFlowPosition(cursorIndex, true);
       return;
     }
 
@@ -447,7 +468,7 @@ export function Screen({
 
       if (Math.abs(distance) < COVER_FLOW_SETTLE_EPSILON) {
         coverFlowPositionRef.current = target;
-        setCoverFlowPosition(target);
+        commitCoverFlowPosition(target, true);
         coverFlowFrameRef.current = null;
         coverFlowLastTimeRef.current = null;
         return;
@@ -462,7 +483,7 @@ export function Screen({
       const nextPosition = current + nextStep;
 
       coverFlowPositionRef.current = nextPosition;
-      setCoverFlowPosition(nextPosition);
+      commitCoverFlowPosition(nextPosition);
       coverFlowFrameRef.current = requestAnimationFrame(step);
     };
 
@@ -479,6 +500,7 @@ export function Screen({
     coverFlowIsDragging,
     coverFlowReleaseId,
     coverFlowReleaseVelocity,
+    commitCoverFlowPosition,
     onCoverFlowSettleTarget,
     shouldReduceMotion,
   ]);
@@ -918,12 +940,15 @@ export function Screen({
       );
     }
 
-    const renderPosition = coverFlowIsSelecting ? cursorIndex : coverFlowPosition;
+    const renderPosition = coverFlowIsSelecting ? cursorIndex : coverFlowRenderPosition;
     const displayIndex = Math.max(0, Math.min(albums.length - 1, Math.round(renderPosition)));
     const displayAlbum = coverFlowIsSelecting ? selectedAlbum : albums[displayIndex] || selectedAlbum;
-    const visibleAlbums = albums
-      .map((album, index) => ({ album, index, distance: index - renderPosition }))
-      .filter(({ index, distance }) => Math.abs(distance) <= COVER_FLOW_VISIBLE_RANGE || (coverFlowIsSelecting && index === cursorIndex));
+    const visibleStart = Math.max(0, Math.floor(renderPosition - COVER_FLOW_VISIBLE_RANGE));
+    const visibleEnd = Math.min(albums.length - 1, Math.ceil(renderPosition + COVER_FLOW_VISIBLE_RANGE));
+    const visibleAlbums: Array<{ album: MenuNode; index: number; distance: number }> = [];
+    for (let index = visibleStart; index <= visibleEnd; index += 1) {
+      visibleAlbums.push({ album: albums[index], index, distance: index - renderPosition });
+    }
     const artist = displayAlbum.detailLines?.[0] || tx(locale, 'Unknown Artist', '未知艺人');
 
     return (
@@ -952,6 +977,14 @@ export function Screen({
               : Math.max(0.16, 1 - Math.min(absDistance, 1) * 0.22 - beyondFirstSlot * 0.18);
             const shadowOpacity = Math.max(0.16, 0.46 - absDistance * 0.08);
             const isHeroCard = coverFlowIsSelecting && isSelectedAlbum;
+            const cardTransition = shouldReduceMotion
+              ? 'none'
+              : coverFlowIsDragging
+                ? 'transform 70ms linear, opacity 70ms linear'
+                : 'transform 110ms cubic-bezier(0.22, 1, 0.36, 1), opacity 90ms linear';
+            const heroTransform = isHeroCard && !shouldReduceMotion
+              ? 'translate3d(0, -10px, 0) scale(1.18)'
+              : 'translate3d(0, 0, 0) scale(1)';
 
             return (
               <div
@@ -962,32 +995,18 @@ export function Screen({
                   zIndex: 100 - Math.round(absDistance * 10),
                   transform: `translate3d(${x}px, ${y}px, ${80 - absDistance * 12}px) rotateY(${rotateY}deg) scale(${scale})`,
                   transformStyle: 'preserve-3d',
+                  transition: cardTransition,
                   willChange: 'transform, opacity',
+                  contain: 'layout paint style',
                 }}
               >
-                <motion.div
+                <div
                   className="relative h-full w-full"
-                  initial={false}
-                  animate={isHeroCard && !shouldReduceMotion
-                    ? {
-                        rotateY: 0,
-                        scale: 1.18,
-                        y: -10,
-                        filter: 'brightness(1.06) saturate(1.06)',
-                      }
-                    : {
-                        rotateY: 0,
-                        scale: 1,
-                        y: 0,
-                        filter: 'brightness(1) saturate(1)',
-                      }}
-                  transition={{
-                    duration: shouldReduceMotion ? 0 : 0.46,
-                    ease: [0.25, 1, 0.5, 1],
-                  }}
                   style={{
+                    transform: heroTransform,
                     transformStyle: 'preserve-3d',
                     transformOrigin: 'center center',
+                    transition: shouldReduceMotion ? 'none' : 'transform 260ms cubic-bezier(0.25, 1, 0.5, 1)',
                     willChange: 'transform',
                   }}
                 >
@@ -1002,17 +1021,19 @@ export function Screen({
                     {renderCoverArtwork(album, absDistance < 0.08)}
                     <div className={`absolute inset-0 pointer-events-none ${absDistance < 0.08 ? (isDarkTheme ? 'bg-[linear-gradient(110deg,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0.025)_34%,rgba(80,0,10,0.18)_100%)]' : 'bg-[linear-gradient(110deg,rgba(255,255,255,0.26)_0%,rgba(255,255,255,0.04)_34%,rgba(0,0,0,0.08)_100%)]') : 'bg-black/10'}`} />
                   </div>
-                </motion.div>
-                <motion.div
+                </div>
+                <div
                   className="absolute left-0 top-[122px] h-10 w-full overflow-hidden [transform:scaleY(-1)]"
-                  animate={{ opacity: shadowOpacity }}
-                  transition={{ duration: shouldReduceMotion ? 0 : 0.16 }}
+                  style={{
+                    opacity: shadowOpacity,
+                    transition: shouldReduceMotion ? 'none' : 'opacity 120ms linear',
+                  }}
                 >
                   <div className={`relative h-full w-full overflow-hidden rounded-[2px] ${isDarkTheme ? 'bg-[#2b2225]' : 'bg-neutral-300'}`}>
                     {renderCoverArtwork(album, false)}
                     <div className={`absolute inset-0 ${isDarkTheme ? 'bg-gradient-to-b from-black/10 via-black/65 to-[#090707]' : 'bg-gradient-to-b from-white/10 via-white/65 to-white'}`} />
                   </div>
-                </motion.div>
+                </div>
                 {absDistance < 0.08 && (
                   <div className={`absolute -inset-1 rounded-[4px] border pointer-events-none ${isDarkTheme ? 'border-[#d92727]/35' : 'border-black/10'}`} />
                 )}
@@ -1021,16 +1042,12 @@ export function Screen({
           })}
         </div>
 
-        <motion.div
-          key={displayAlbum.id}
+        <div
           className={`absolute inset-x-7 bottom-0 z-[160] px-3 py-2 text-center ${isDarkTheme ? '[text-shadow:0_1px_1px_rgba(0,0,0,0.75)]' : '[text-shadow:0_1px_1px_rgba(255,255,255,0.75)]'}`}
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.16 }}
         >
           <div className={`truncate text-[15px] font-black leading-tight ${isDarkTheme ? 'text-[#f7efed]' : 'text-neutral-950'}`}>{displayAlbum.title}</div>
           <div className={`mt-1 truncate text-[11px] font-bold leading-tight ${isDarkTheme ? 'text-[#b9a6aa]' : 'text-neutral-700'}`}>{artist}</div>
-        </motion.div>
+        </div>
       </div>
     );
   };
