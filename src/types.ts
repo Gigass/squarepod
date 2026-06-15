@@ -8,6 +8,7 @@ export type ShuffleMode = 'off' | 'songs';
 export type PlaybackMode = 'sequential' | 'shuffle' | 'repeatAll' | 'repeatOne';
 export type DeviceMode = 'clickWheel' | 'nano6Touch';
 export type AppTheme = 'light' | 'dark';
+export type ClickWheelColor = 'white' | 'blue' | 'darkGray' | 'u2Red';
 export type EditorKind = 'note' | 'contact' | 'calendarEvent' | 'ebook' | 'workout';
 export type EditorMode = 'create' | 'edit';
 export type EditorFieldKey = 'title' | 'body' | 'name' | 'phone' | 'email' | 'date' | 'time' | 'notes';
@@ -38,6 +39,7 @@ export type MenuAction =
   | 'player_shuffle_all'
   | 'settings_cycle_click_sound'
   | 'settings_toggle_theme'
+  | 'settings_set_clickwheel_color'
   | 'settings_cycle_device_mode'
   | 'settings_set_device_mode'
   | 'settings_toggle_auto_scan'

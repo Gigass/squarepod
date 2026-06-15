@@ -1,4 +1,4 @@
-import { AppTheme, DeviceMode, Song, MenuNode, PlaybackMode, SleepTimerEndAction } from './types';
+import { AppTheme, ClickWheelColor, DeviceMode, Song, MenuNode, PlaybackMode, SleepTimerEndAction } from './types';
 import React from 'react';
 import { Activity, BookOpen, Mic, PlayCircle, Film, Image as ImageIcon, Radio as RadioIcon, Settings, Shuffle, Clock, FileText, Calendar, Info, Volume2, RefreshCw, RotateCcw } from 'lucide-react';
 import { LocalMusicSourceMode, LocalMusicTrack, LocalMusicTrackSource } from './native/localMusic';
@@ -158,6 +158,7 @@ export interface LocalMusicMenuState {
   language?: Locale;
   deviceMode?: DeviceMode;
   theme?: AppTheme;
+  clickWheelColor?: ClickWheelColor;
 }
 
 export interface ContactEntry {
@@ -1713,6 +1714,42 @@ const themeLabel = (theme: AppTheme | undefined, locale: Locale) => (
   theme === 'dark' ? tx(locale, 'Dark', '深色') : tx(locale, 'Light', '浅色')
 );
 
+const clickWheelColorLabel = (color: ClickWheelColor | undefined, locale: Locale) => {
+  switch (color) {
+    case 'blue':
+      return tx(locale, 'Blue', '蓝色');
+    case 'darkGray':
+      return tx(locale, 'Dark Gray', '深灰色');
+    case 'u2Red':
+      return tx(locale, 'U2 Red', 'U2 红');
+    case 'white':
+    default:
+      return tx(locale, 'White', '白色');
+  }
+};
+
+const CLICK_WHEEL_COLOR_OPTIONS: Array<{
+  value: ClickWheelColor;
+  description: (locale: Locale) => string;
+}> = [
+  {
+    value: 'white',
+    description: locale => tx(locale, 'Classic white plastic click wheel.', 'Classic 白色塑料滚轮。'),
+  },
+  {
+    value: 'blue',
+    description: locale => tx(locale, 'Satin blue click wheel with dark legends.', '缎面蓝色滚轮，深色图标文字。'),
+  },
+  {
+    value: 'darkGray',
+    description: locale => tx(locale, 'Graphite dark gray click wheel with light legends.', '石墨深灰滚轮，浅色图标文字。'),
+  },
+  {
+    value: 'u2Red',
+    description: locale => tx(locale, 'iPod U2-style satin red click wheel with black legends.', 'iPod U2 风格缎面红色滚轮，黑色图标文字。'),
+  },
+];
+
 const generateMainMenuSettings = (local: LocalMusicMenuState = {}): MenuNode => {
   const locale = normalizeLocale(local.language);
   const titles: Record<string, string> = {
@@ -2177,7 +2214,7 @@ const generateSettingsMenu = (local: LocalMusicMenuState = {}): MenuNode => {
         type: 'about',
         previewIcon: <Info className="w-16 h-16" />,
         detailLines: [
-          'Version: V1.8',
+          'Version: V1.9',
           'Devices: Nano6 + Classic',
           `${t(locale, 'allSongs')}: ${trackCount}`,
           `${t(locale, 'artists')}: ${artistCount}`,
@@ -2255,9 +2292,32 @@ const generateSettingsMenu = (local: LocalMusicMenuState = {}): MenuNode => {
             detailLines: [
               `${tx(locale, 'Theme', '主题')}: ${themeLabel(local.theme, locale)}`,
               local.theme === 'dark'
-                ? tx(locale, 'Classic U2-style black body and red click wheel.', 'Classic U2 风格黑色机身与红色滚轮。')
-                : tx(locale, 'Classic white body and white click wheel.', 'Classic 白色机身与白色滚轮。'),
+                ? tx(locale, 'Classic dark body and dark screen treatment.', 'Classic 深色机身与深色屏幕。')
+                : tx(locale, 'Classic white body and light screen treatment.', 'Classic 白色机身与浅色屏幕。'),
             ],
+          },
+          {
+            id: 'set_clickwheel_color',
+            title: `${tx(locale, 'Click Wheel Color', '滚轮颜色')}: ${clickWheelColorLabel(local.clickWheelColor, locale)}`,
+            type: 'menu',
+            detailLines: [
+              `${tx(locale, 'Current', '当前')}: ${clickWheelColorLabel(local.clickWheelColor, locale)}`,
+              CLICK_WHEEL_COLOR_OPTIONS.map(option => clickWheelColorLabel(option.value, locale)).join(' / '),
+            ],
+            children: CLICK_WHEEL_COLOR_OPTIONS.map(option => ({
+              id: `set_clickwheel_color_${option.value}`,
+              title: clickWheelColorLabel(option.value, locale),
+              type: 'localMusicStatus' as const,
+              action: 'settings_set_clickwheel_color' as const,
+              settingKey: option.value,
+              statusTone: local.clickWheelColor === option.value ? 'success' as const : 'neutral' as const,
+              detailLines: [
+                option.description(locale),
+                local.clickWheelColor === option.value
+                  ? tx(locale, 'Current click wheel color.', '当前滚轮颜色。')
+                  : tx(locale, 'Select to apply this click wheel color.', '选择以应用此滚轮颜色。'),
+              ],
+            })),
           },
           {
             id: 'set_click_sound',

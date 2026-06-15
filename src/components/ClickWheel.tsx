@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppTheme } from '../types';
+import { AppTheme, ClickWheelColor } from '../types';
 import { RotateEndMeta, useWheel } from '../useWheel';
 import { playOuterButtonClick, playSelectClick, playWheelTick, unlockUiAudio } from '../audio/uiSounds';
 import { WheelHaptics } from '../native/wheelHaptics';
@@ -8,6 +8,42 @@ const CLICK_WHEEL_SENSITIVITY = Math.PI / 6;
 const OUTER_BUTTON_SOUND_DELAY_MS = 70;
 const LONG_PRESS_START_MS = 700;
 const LONG_PRESS_REPEAT_MS = 180;
+
+const wheelBaseClass = 'h-[calc(100%+7px)] max-h-[343px] aspect-square rounded-full flex items-center justify-center relative touch-none pointer-events-auto cursor-pointer';
+const selectVisualBaseClass = 'absolute left-1/2 top-1/2 z-10 h-[35%] w-[35%] -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none';
+const selectButtonBaseClass = 'absolute left-1/2 top-1/2 z-20 h-[24%] w-[24%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent cursor-pointer pointer-events-auto outline-none focus:outline-none focus-visible:ring-2';
+
+const clickWheelPalettes: Record<ClickWheelColor, {
+  wheelClass: string;
+  labelClass: string;
+  selectVisualClass: string;
+  selectButtonClass: string;
+}> = {
+  white: {
+    wheelClass: 'bg-white shadow-[0_10px_20px_rgba(0,0,0,0.1),inset_0_1px_4px_rgba(0,0,0,0.1)] border border-gray-100',
+    labelClass: 'text-[#9CA3AF]',
+    selectVisualClass: 'border border-gray-400 bg-gradient-to-b from-gray-100 to-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.15)]',
+    selectButtonClass: 'focus-visible:ring-gray-500/40',
+  },
+  blue: {
+    wheelClass: 'border border-[#4f8cab] bg-[linear-gradient(180deg,rgba(255,255,255,0.16)_0%,rgba(255,255,255,0)_40%),linear-gradient(180deg,#7dc7e8_0%,#5ab2dc_54%,#419bc6_100%)] shadow-[0_14px_24px_rgba(0,0,0,0.28),inset_0_1px_1px_rgba(255,255,255,0.22),inset_0_-1px_2px_rgba(0,42,70,0.22)]',
+    labelClass: 'text-[#061016]',
+    selectVisualClass: 'border border-[#2c6f91] bg-[linear-gradient(180deg,#d8eef8_0%,#9fd4ea_46%,#5fa8ca_100%)] shadow-[0_3px_6px_rgba(0,28,48,0.32),inset_0_1px_0_rgba(255,255,255,0.38)]',
+    selectButtonClass: 'focus-visible:ring-[#6ec5ef]/70',
+  },
+  darkGray: {
+    wheelClass: 'border border-[#3a3d41] bg-[linear-gradient(180deg,rgba(255,255,255,0.07)_0%,rgba(255,255,255,0)_36%),linear-gradient(180deg,#3d4147_0%,#2b2f34_52%,#1e2125_100%)] shadow-[0_16px_28px_rgba(0,0,0,0.44),inset_0_1px_1px_rgba(255,255,255,0.10),inset_0_-1px_2px_rgba(0,0,0,0.35)]',
+    labelClass: 'text-[#d8dde2]',
+    selectVisualClass: 'border border-[#121417] bg-[linear-gradient(180deg,#22262a_0%,#111315_100%)] shadow-[0_3px_6px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.10)]',
+    selectButtonClass: 'focus-visible:ring-[#d8dde2]/65',
+  },
+  u2Red: {
+    wheelClass: 'border border-[#a91518] bg-[linear-gradient(180deg,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0)_38%),linear-gradient(180deg,#df302c_0%,#d92727_52%,#c91f22_100%)] shadow-[0_16px_28px_rgba(0,0,0,0.48),inset_0_1px_1px_rgba(255,255,255,0.16),inset_0_-1px_2px_rgba(85,0,0,0.18)]',
+    labelClass: 'text-[#050303]',
+    selectVisualClass: 'border border-[#3a3032] bg-[linear-gradient(180deg,#242022_0%,#111011_100%)] shadow-[0_3px_6px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.12)]',
+    selectButtonClass: 'focus-visible:ring-[#d92727]/70',
+  },
+};
 
 const hapticButton = () => {
   WheelHaptics.tick({
@@ -39,6 +75,7 @@ interface ClickWheelProps {
   onRotateStart?: () => void;
   onRotateEnd?: (meta: RotateEndMeta) => void;
   theme?: AppTheme;
+  color?: ClickWheelColor;
 }
 
 export function ClickWheel({
@@ -53,8 +90,10 @@ export function ClickWheel({
   onRotateStart,
   onRotateEnd,
   theme = 'light',
+  color,
 }: ClickWheelProps) {
   const isDarkTheme = theme === 'dark';
+  const palette = clickWheelPalettes[color || (isDarkTheme ? 'u2Red' : 'white')];
   const pendingOuterButtonSoundRef = React.useRef<number | null>(null);
   const longPressStartRef = React.useRef<number | null>(null);
   const longPressRepeatRef = React.useRef<number | null>(null);
@@ -197,16 +236,10 @@ export function ClickWheel({
     };
   }, []);
 
-  const wheelClass = isDarkTheme
-    ? 'h-[calc(100%+7px)] max-h-[343px] aspect-square rounded-full border border-[#a91518] bg-[linear-gradient(180deg,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0)_38%),linear-gradient(180deg,#df302c_0%,#d92727_52%,#c91f22_100%)] shadow-[0_16px_28px_rgba(0,0,0,0.48),inset_0_1px_1px_rgba(255,255,255,0.16),inset_0_-1px_2px_rgba(85,0,0,0.18)] flex items-center justify-center relative touch-none pointer-events-auto cursor-pointer'
-    : 'h-[calc(100%+7px)] max-h-[343px] aspect-square rounded-full bg-white shadow-[0_10px_20px_rgba(0,0,0,0.1),inset_0_1px_4px_rgba(0,0,0,0.1)] border border-gray-100 flex items-center justify-center relative touch-none pointer-events-auto cursor-pointer';
-  const wheelLabelClass = isDarkTheme ? 'text-[#050303]' : 'text-[#9CA3AF]';
-  const selectVisualClass = isDarkTheme
-    ? 'absolute left-1/2 top-1/2 z-10 h-[35%] w-[35%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#3a3032] bg-[linear-gradient(180deg,#242022_0%,#111011_100%)] shadow-[0_3px_6px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.12)] pointer-events-none'
-    : 'absolute left-1/2 top-1/2 z-10 h-[35%] w-[35%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-gray-400 bg-gradient-to-b from-gray-100 to-gray-300 shadow-[0_2px_4px_rgba(0,0,0,0.15)] pointer-events-none';
-  const selectButtonClass = isDarkTheme
-    ? 'absolute left-1/2 top-1/2 z-20 h-[24%] w-[24%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent cursor-pointer pointer-events-auto outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d92727]/70'
-    : 'absolute left-1/2 top-1/2 z-20 h-[24%] w-[24%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent cursor-pointer pointer-events-auto outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/40';
+  const wheelClass = `${wheelBaseClass} ${palette.wheelClass}`;
+  const wheelLabelClass = palette.labelClass;
+  const selectVisualClass = `${selectVisualBaseClass} ${palette.selectVisualClass}`;
+  const selectButtonClass = `${selectButtonBaseClass} ${palette.selectButtonClass}`;
 
   return (
     <div className="relative w-full h-full flex items-center justify-center select-none" style={{ touchAction: 'none' }}>

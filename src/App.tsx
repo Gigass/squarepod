@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { strFromU8, unzipSync } from 'fflate';
 import { CalendarEventEntry, ContactEntry, DEFAULT_EBOOKS, EbookEntry, generateMenuRoot, isMainMenuItemEnabled, NoteEntry, normalizeMainMenuOrder, SleepTimerMenuState, WorkoutEntry } from './data';
-import { AppTheme, DeviceMode, EditorFieldKey, EditorMode, MenuNode, PlaybackMode, SleepTimerEndAction, TextEditorState } from './types';
+import { AppTheme, ClickWheelColor, DeviceMode, EditorFieldKey, EditorMode, MenuNode, PlaybackMode, SleepTimerEndAction, TextEditorState } from './types';
 import { useLocalMusic } from './useLocalMusic';
 import { useMediaLibrary } from './useMediaLibrary';
 import { useRadio } from './useRadio';
@@ -67,6 +67,7 @@ const COMPILATIONS_KEY = 'squarepod.compilations.v1';
 const LANGUAGE_KEY = 'squarepod.language.v1';
 const DEVICE_MODE_KEY = 'squarepod.deviceMode.v1';
 const THEME_KEY = 'squarepod.theme.v1';
+const CLICK_WHEEL_COLOR_KEY = 'squarepod.clickWheelColor.v1';
 const NANO6_WALLPAPER_KEY = 'squarepod.nano6Wallpaper.v1';
 const SETTINGS_DEFAULTS_VERSION_KEY = 'squarepod.settingsDefaultsVersion.v1';
 const PLAYBACK_MODE_ORDER: PlaybackMode[] = ['sequential', 'shuffle', 'repeatAll', 'repeatOne'];
@@ -227,6 +228,15 @@ const writeString = (key: string, value: string) => {
 
 const readTheme = (): AppTheme => (
   readString(THEME_KEY, 'light') === 'dark' ? 'dark' : 'light'
+);
+
+const normalizeClickWheelColor = (value: string | undefined | null): ClickWheelColor | undefined => {
+  if (value === 'white' || value === 'blue' || value === 'darkGray' || value === 'u2Red') return value;
+  return undefined;
+};
+
+const readClickWheelColor = (): ClickWheelColor => (
+  normalizeClickWheelColor(readString(CLICK_WHEEL_COLOR_KEY, '')) || (readTheme() === 'dark' ? 'u2Red' : 'white')
 );
 
 const readBoolean = (key: string, fallback: boolean) => {
@@ -442,6 +452,7 @@ export default function App() {
   const [language, setLanguage] = useState<Locale>(() => normalizeLocale(readString(LANGUAGE_KEY, 'en')));
   const [deviceMode, setDeviceMode] = useState<DeviceMode>(readDeviceMode);
   const [theme, setTheme] = useState<AppTheme>(readTheme);
+  const [clickWheelColor, setClickWheelColor] = useState<ClickWheelColor>(readClickWheelColor);
   const [nano6Wallpaper, setNano6Wallpaper] = useState(() => readString(NANO6_WALLPAPER_KEY, ''));
   const [screenLocked, setScreenLocked] = useState(false);
   const [unlockArmed, setUnlockArmed] = useState(false);
@@ -523,6 +534,7 @@ export default function App() {
     language,
     deviceMode,
     theme,
+    clickWheelColor,
   }), [
     localMusic.status,
     localMusic.message,
@@ -568,6 +580,7 @@ export default function App() {
     language,
     deviceMode,
     theme,
+    clickWheelColor,
   ]);
 
   const [stack, setStack] = useState<StackItem[]>([{ node: rootMenu, cursorIndex: 0 }]);
@@ -686,6 +699,7 @@ export default function App() {
   useEffect(() => { writeString(LANGUAGE_KEY, language); }, [language]);
   useEffect(() => { writeString(DEVICE_MODE_KEY, deviceMode); }, [deviceMode]);
   useEffect(() => { writeString(THEME_KEY, theme); }, [theme]);
+  useEffect(() => { writeString(CLICK_WHEEL_COLOR_KEY, clickWheelColor); }, [clickWheelColor]);
   useEffect(() => { writeString(NANO6_WALLPAPER_KEY, nano6Wallpaper); }, [nano6Wallpaper]);
 
   useEffect(() => {
@@ -1313,6 +1327,11 @@ export default function App() {
       case 'settings_toggle_theme':
         setTheme(current => current === 'dark' ? 'light' : 'dark');
         break;
+      case 'settings_set_clickwheel_color': {
+        const nextColor = normalizeClickWheelColor(node.settingKey);
+        if (nextColor) setClickWheelColor(nextColor);
+        break;
+      }
       case 'settings_cycle_device_mode':
         switchDeviceMode(current => current === 'clickWheel' ? 'nano6Touch' : 'clickWheel');
         break;
@@ -1542,6 +1561,7 @@ export default function App() {
         setCompilationsEnabled(true);
         setLanguage('en');
         setTheme('light');
+        setClickWheelColor('white');
         switchDeviceMode('clickWheel');
         setNoteDraft(undefined);
         setSleepTimer(DEFAULT_SLEEP_TIMER);
@@ -1550,6 +1570,7 @@ export default function App() {
         writeString(LIBRARY_SOURCE_KEY, 'squarepod');
         writeString(BACKLIGHT_TIMER_KEY, DEFAULT_BACKLIGHT_TIMER);
         writeString(THEME_KEY, 'light');
+        writeString(CLICK_WHEEL_COLOR_KEY, 'white');
         writeUiSoundVolume(DEFAULT_UI_SOUND_VOLUME);
         writeString(SETTINGS_DEFAULTS_VERSION_KEY, SETTINGS_DEFAULTS_VERSION);
         await setPlaybackMode('sequential');
@@ -2217,6 +2238,7 @@ export default function App() {
             onRotateStart={handleRotateStart}
             onRotateEnd={handleRotateEnd}
             theme={theme}
+            color={clickWheelColor}
           />
         </div>
 
