@@ -1,8 +1,8 @@
 import { PluginListenerHandle, registerPlugin } from '@capacitor/core';
 
 export type LocalRepeatMode = 'off' | 'one' | 'all';
-export type LocalMusicSourceMode = 'squarepod' | 'android' | 'all';
-export type LocalMusicTrackSource = 'appFolder' | 'publicSquarePod' | 'mediaStore';
+export type LocalMusicSourceMode = 'squarepod' | 'android' | 'all' | 'custom';
+export type LocalMusicTrackSource = 'appFolder' | 'publicSquarePod' | 'mediaStore' | 'customFolder';
 
 export interface LocalLyricLine {
   time: number;
@@ -26,12 +26,23 @@ export interface LocalMusicTrack {
   sourcePath?: string;
 }
 
+export interface LocalMusicCustomFolder {
+  selected: boolean;
+  uri: string;
+  name: string;
+  displayPath: string;
+}
+
 export interface LocalMusicLibrary {
   tracks: LocalMusicTrack[];
   musicDirectory: string;
   publicMusicDirectory?: string;
   sourceMode?: LocalMusicSourceMode;
   sourceCounts?: Partial<Record<LocalMusicTrackSource, number>>;
+  customFolderUri?: string;
+  customFolderName?: string;
+  customFolderDisplayPath?: string;
+  hasCustomFolder?: boolean;
 }
 
 export interface LocalMusicPlaybackState {
@@ -49,6 +60,9 @@ export interface LocalMusicPlaybackState {
 
 export interface LocalMusicPlugin {
   scanLibrary(options?: { sourceMode?: LocalMusicSourceMode }): Promise<LocalMusicLibrary>;
+  pickCustomFolder(): Promise<LocalMusicCustomFolder>;
+  getCustomFolder(): Promise<LocalMusicCustomFolder>;
+  clearCustomFolder(): Promise<LocalMusicCustomFolder>;
   playQueue(options: { tracks: LocalMusicTrack[]; startIndex?: number; shuffle?: boolean; repeatMode?: LocalRepeatMode }): Promise<LocalMusicPlaybackState>;
   play(): Promise<LocalMusicPlaybackState>;
   pause(): Promise<LocalMusicPlaybackState>;

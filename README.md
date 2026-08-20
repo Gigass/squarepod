@@ -209,6 +209,16 @@ Library Source options:
 | `SquarePod` | `/sdcard/Music/SquarePod` and the app's external `Music` folder. This is the default. | Put user music in `/sdcard/Music/SquarePod`. |
 | `Android` | Android MediaStore audio library only. | Put music anywhere Android indexes as music, usually under `/sdcard/Music`. Game and emulator audio may also appear in this mode. |
 | `All` | SquarePod folders plus Android MediaStore. | Use only if you intentionally want both SquarePod-managed music and the full Android media library. |
+| `Custom` | A folder you pick with the Android system folder picker (Storage Access Framework). | Keep music where it already lives (for example an external SD card `Music` folder) and grant SquarePod access once. No copy into `/sdcard/Music/SquarePod` is required. |
+
+To use a custom folder such as an external SD card music directory:
+
+```text
+Settings -> Library -> Library Source -> Custom
+Settings -> Library -> Choose Custom Folder
+```
+
+Android opens the system folder picker. Select the SD card (or other volume), open the music folder, then confirm. SquarePod keeps a persistable read grant so later scans and playback work after reboot. Use **Clear Custom Folder** to revoke that grant.
 
 Do not use the app external folder as the normal manual import path:
 
@@ -511,6 +521,16 @@ Settings -> Library -> Library Source
 | `SquarePod` | `/sdcard/Music/SquarePod` 和应用外部 `Music` 文件夹。这是默认值。 | 把用户音乐放到 `/sdcard/Music/SquarePod`。 |
 | `Android` | 只扫描 Android MediaStore 音频库。 | 放到 Android 会索引为音乐的位置，通常是 `/sdcard/Music`。这个模式下游戏和模拟器音频也可能出现。 |
 | `All` | SquarePod 文件夹 + Android MediaStore。 | 只有在你明确想同时读取 SquarePod 管理音乐和完整 Android 媒体库时使用。 |
+| `Custom` | 通过 Android 系统文件夹选择器（Storage Access Framework）选择的文件夹。 | 音乐可以留在原位置（例如外置 SD 卡的 `Music` 文件夹），授予 SquarePod 访问权限即可，无需复制到 `/sdcard/Music/SquarePod`。 |
+
+使用自定义文件夹（例如外置 SD 卡音乐目录）：
+
+```text
+Settings -> Library -> Library Source -> Custom
+Settings -> Library -> Choose Custom Folder
+```
+
+Android 会打开系统文件夹选择器。选择 SD 卡（或其他存储卷），进入音乐文件夹后确认。SquarePod 会保存可持久化的读取授权，重启后仍可扫描和播放。使用 **Clear Custom Folder** 可撤销该授权。
 
 不建议把应用外部目录作为日常手动导入路径：
 

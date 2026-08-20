@@ -5,48 +5,55 @@ import { PlaybackMode, ShuffleMode, Song } from './types';
 
 export type LocalMusicStatus = 'idle' | 'working' | 'ready' | 'needsPermission' | 'error' | 'success';
 
-const CACHE_KEY = 'squarepod.localMusicLibrary.v2';
+const CACHE_KEY = 'squarepod.localMusicLibrary.v3';
 const FALLBACK_COVER = 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&q=80&w=400';
 const WEB_PREVIEW_SEED_PATH = '/dev-local-music-seed.json';
 
-interface LocalMusicCacheV2 {
-  version: 2;
+interface LocalMusicCacheV3 {
+  version: 3;
   sourceMode: LocalMusicSourceMode;
   scannedAt: number;
   musicDirectory: string;
   publicMusicDirectory?: string;
+  customFolderUri?: string;
+  customFolderName?: string;
+  customFolderDisplayPath?: string;
   tracks: LocalMusicTrack[];
   sourceCounts?: Partial<Record<LocalMusicTrackSource, number>>;
 }
 
 const normalizeSourceMode = (value?: string): LocalMusicSourceMode => {
-  if (value === 'android' || value === 'all') return value;
+  if (value === 'android' || value === 'all' || value === 'custom') return value;
   return 'squarepod';
 };
 
 const sourceModeLabel = (mode: LocalMusicSourceMode) => {
   if (mode === 'android') return 'Android media library';
   if (mode === 'all') return 'SquarePod folders and Android media library';
+  if (mode === 'custom') return 'custom folder';
   return 'SquarePod folders';
 };
 
-const readCachedLibrary = (sourceMode: LocalMusicSourceMode): LocalMusicCacheV2 | undefined => {
+const readCachedLibrary = (sourceMode: LocalMusicSourceMode): LocalMusicCacheV3 | undefined => {
   if (typeof window === 'undefined') return undefined;
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(CACHE_KEY) || '') as Partial<LocalMusicCacheV2>;
+    const parsed = JSON.parse(window.localStorage.getItem(CACHE_KEY) || '') as Partial<LocalMusicCacheV3>;
     if (
-      parsed?.version !== 2 ||
+      parsed?.version !== 3 ||
       normalizeSourceMode(parsed.sourceMode) !== sourceMode ||
       !Array.isArray(parsed.tracks)
     ) {
       return undefined;
     }
     return {
-      version: 2,
+      version: 3,
       sourceMode,
       scannedAt: Number(parsed.scannedAt) || 0,
       musicDirectory: parsed.musicDirectory || '',
       publicMusicDirectory: parsed.publicMusicDirectory,
+      customFolderUri: parsed.customFolderUri,
+      customFolderName: parsed.customFolderName,
+      customFolderDisplayPath: parsed.customFolderDisplayPath,
       tracks: parsed.tracks,
       sourceCounts: parsed.sourceCounts,
     };
@@ -61,16 +68,22 @@ const writeCachedLibrary = (
     tracks: LocalMusicTrack[];
     musicDirectory?: string;
     publicMusicDirectory?: string;
+    customFolderUri?: string;
+    customFolderName?: string;
+    customFolderDisplayPath?: string;
     sourceCounts?: Partial<Record<LocalMusicTrackSource, number>>;
   },
 ) => {
   if (typeof window === 'undefined') return;
-  const cache: LocalMusicCacheV2 = {
-    version: 2,
+  const cache: LocalMusicCacheV3 = {
+    version: 3,
     sourceMode,
     scannedAt: Date.now(),
     musicDirectory: library.musicDirectory || '',
     publicMusicDirectory: library.publicMusicDirectory,
+    customFolderUri: library.customFolderUri,
+    customFolderName: library.customFolderName,
+    customFolderDisplayPath: library.customFolderDisplayPath,
     tracks: library.tracks,
     sourceCounts: library.sourceCounts,
   };
@@ -116,6 +129,9 @@ export function useLocalMusic({ autoScan = true, sourceMode = 'squarepod' }: Use
   const [tracks, setTracks] = useState<LocalMusicTrack[]>(() => initialCache()?.tracks || []);
   const [musicDirectory, setMusicDirectory] = useState('');
   const [publicMusicDirectory, setPublicMusicDirectory] = useState('');
+  const [customFolderUri, setCustomFolderUri] = useState(() => initialCache()?.customFolderUri || '');
+  const [customFolderName, setCustomFolderName] = useState(() => initialCache()?.customFolderName || '');
+  const [customFolderDisplayPath, setCustomFolderDisplayPath] = useState(() => initialCache()?.customFolderDisplayPath || '');
   const [sourceCounts, setSourceCounts] = useState<Partial<Record<LocalMusicTrackSource, number>>>({});
   const [playbackState, setPlaybackState] = useState<LocalMusicPlaybackState>();
   const [shuffleMode, setShuffleModeState] = useState<ShuffleMode>('off');
@@ -134,13 +150,20 @@ export function useLocalMusic({ autoScan = true, sourceMode = 'squarepod' }: Use
     setTracks(cached?.tracks || []);
     setMusicDirectory(cached?.musicDirectory || '');
     setPublicMusicDirectory(cached?.publicMusicDirectory || '');
+    setCustomFolderUri(cached?.customFolderUri || '');
+    setCustomFolderName(cached?.customFolderName || '');
+    setCustomFolderDisplayPath(cached?.customFolderDisplayPath || '');
     setSourceCounts(cached?.sourceCounts || {});
     if (cached?.tracks.length) {
       setStatus('success');
       setMessage(`Loaded ${cached.tracks.length} cached local songs from ${sourceModeLabel(activeSourceMode)}.`);
     } else if (!isPlaying) {
       setStatus('idle');
-      setMessage(`Scan ${sourceModeLabel(activeSourceMode)} to build your library.`);
+      setMessage(
+        activeSourceMode === 'custom'
+          ? 'Pick a custom music folder in Settings, then scan.'
+          : `Scan ${sourceModeLabel(activeSourceMode)} to build your library.`,
+      );
     }
   }, [activeSourceMode, isPlaying]);
 
@@ -269,6 +292,18 @@ export function useLocalMusic({ autoScan = true, sourceMode = 'squarepod' }: Use
     }
   };
 
+  const applyCustomFolder = (folder: {
+    selected?: boolean;
+    uri?: string;
+    name?: string;
+    displayPath?: string;
+  }) => {
+    const selected = Boolean(folder.selected && folder.uri);
+    setCustomFolderUri(selected ? (folder.uri || '') : '');
+    setCustomFolderName(selected ? (folder.name || '') : '');
+    setCustomFolderDisplayPath(selected ? (folder.displayPath || folder.name || '') : '');
+  };
+
   const scanLibrary = async () => {
     if (!isAndroid) throw new Error('Local music scan is only implemented in the Android app.');
     setStatus('working');
@@ -279,12 +314,24 @@ export function useLocalMusic({ autoScan = true, sourceMode = 'squarepod' }: Use
       setTracks(library.tracks);
       setMusicDirectory(library.musicDirectory);
       setPublicMusicDirectory(library.publicMusicDirectory || '');
+      applyCustomFolder({
+        selected: library.hasCustomFolder,
+        uri: library.customFolderUri,
+        name: library.customFolderName,
+        displayPath: library.customFolderDisplayPath,
+      });
       setSourceCounts(library.sourceCounts || {});
       writeCachedLibrary(resolvedSourceMode, library);
       setStatus('success');
+      const folderHint = library.customFolderDisplayPath
+        || library.customFolderName
+        || library.publicMusicDirectory
+        || library.musicDirectory;
       setMessage(library.tracks.length
         ? `Scanned ${library.tracks.length} local songs from ${sourceModeLabel(resolvedSourceMode)}.`
-        : `No songs found. Add files to ${library.musicDirectory}`);
+        : resolvedSourceMode === 'custom' && !library.hasCustomFolder
+          ? 'No custom folder selected. Choose a folder in Settings -> Library.'
+          : `No songs found${folderHint ? ` in ${folderHint}` : ''}.`);
       return library;
     } catch (error) {
       const nextMessage = error instanceof Error ? error.message : 'Local music scan failed.';
@@ -294,8 +341,67 @@ export function useLocalMusic({ autoScan = true, sourceMode = 'squarepod' }: Use
     }
   };
 
+  const refreshCustomFolder = async () => {
+    if (!isAndroid) return undefined;
+    const folder = await LocalMusic.getCustomFolder();
+    applyCustomFolder(folder);
+    return folder;
+  };
+
+  const pickCustomFolder = async () => {
+    if (!isAndroid) throw new Error('Custom folders are only available in the Android app.');
+    setStatus('working');
+    setMessage('Choose a music folder...');
+    try {
+      const folder = await LocalMusic.pickCustomFolder();
+      applyCustomFolder(folder);
+      setStatus('success');
+      setMessage(folder.selected
+        ? `Custom folder set to ${folder.displayPath || folder.name || 'selected folder'}.`
+        : 'No custom folder selected.');
+      if (activeSourceMode === 'custom' && folder.selected) {
+        await scanLibrary();
+      }
+      return folder;
+    } catch (error) {
+      const nextMessage = error instanceof Error ? error.message : 'Folder selection failed.';
+      setStatus(nextMessage.includes('cancelled') ? 'idle' : 'error');
+      setMessage(nextMessage);
+      throw error;
+    }
+  };
+
+  const clearCustomFolder = async () => {
+    if (!isAndroid) throw new Error('Custom folders are only available in the Android app.');
+    const folder = await LocalMusic.clearCustomFolder();
+    applyCustomFolder(folder);
+    if (activeSourceMode === 'custom') {
+      setTracks([]);
+      setSourceCounts({});
+      writeCachedLibrary(activeSourceMode, {
+        tracks: [],
+        musicDirectory,
+        publicMusicDirectory,
+        sourceCounts: {},
+      });
+      setMessage('Custom folder cleared. Choose a folder to scan.');
+    }
+    return folder;
+  };
+
   useEffect(() => {
     if (!isAndroid || !autoScan) return;
+    if (activeSourceMode === 'custom') {
+      refreshCustomFolder()
+        .then(folder => {
+          if (folder?.selected) return scanLibrary();
+          setStatus('idle');
+          setMessage('Pick a custom music folder in Settings, then scan.');
+          return undefined;
+        })
+        .catch(() => undefined);
+      return;
+    }
     scanLibrary().catch(() => undefined);
   }, [activeSourceMode, autoScan, isAndroid]);
 
@@ -380,6 +486,10 @@ export function useLocalMusic({ autoScan = true, sourceMode = 'squarepod' }: Use
     tracks,
     musicDirectory,
     publicMusicDirectory,
+    customFolderUri,
+    customFolderName,
+    customFolderDisplayPath,
+    hasCustomFolder: Boolean(customFolderUri),
     sourceMode: activeSourceMode,
     sourceCounts,
     currentSong,
@@ -391,6 +501,9 @@ export function useLocalMusic({ autoScan = true, sourceMode = 'squarepod' }: Use
     shuffleMode,
     repeatMode,
     scanLibrary,
+    pickCustomFolder,
+    clearCustomFolder,
+    refreshCustomFolder,
     playQueue,
     playPause,
     pausePlayback,

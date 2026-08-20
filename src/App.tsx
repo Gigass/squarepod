@@ -71,7 +71,7 @@ const CLICK_WHEEL_COLOR_KEY = 'squarepod.clickWheelColor.v1';
 const NANO6_WALLPAPER_KEY = 'squarepod.nano6Wallpaper.v1';
 const SETTINGS_DEFAULTS_VERSION_KEY = 'squarepod.settingsDefaultsVersion.v1';
 const PLAYBACK_MODE_ORDER: PlaybackMode[] = ['sequential', 'shuffle', 'repeatAll', 'repeatOne'];
-const LIBRARY_SOURCE_ORDER: LocalMusicSourceMode[] = ['squarepod', 'android', 'all'];
+const LIBRARY_SOURCE_ORDER: LocalMusicSourceMode[] = ['squarepod', 'android', 'all', 'custom'];
 const UI_SOUND_VOLUME_STEPS = [0, 0.25, 0.5, 0.75, 1];
 const DEFAULT_UI_SOUND_VOLUME = 1;
 const DEFAULT_BACKLIGHT_TIMER = 'Always On';
@@ -180,7 +180,7 @@ const writeAutoScan = (enabled: boolean) => {
 
 const readLibrarySource = (): LocalMusicSourceMode => {
   const value = readString(LIBRARY_SOURCE_KEY, 'squarepod');
-  return value === 'android' || value === 'all' ? value : 'squarepod';
+  return value === 'android' || value === 'all' || value === 'custom' ? value : 'squarepod';
 };
 
 const readJson = <T,>(key: string, fallback: T): T => {
@@ -491,6 +491,9 @@ export default function App() {
     tracks: localMusic.tracks,
     musicDirectory: localMusic.musicDirectory,
     publicMusicDirectory: localMusic.publicMusicDirectory,
+    customFolderName: localMusic.customFolderName,
+    customFolderDisplayPath: localMusic.customFolderDisplayPath,
+    hasCustomFolder: localMusic.hasCustomFolder,
     sourceMode: localMusic.sourceMode,
     sourceCounts: localMusic.sourceCounts,
     currentTrack: localMusic.currentTrack,
@@ -541,6 +544,9 @@ export default function App() {
     localMusic.tracks,
     localMusic.musicDirectory,
     localMusic.publicMusicDirectory,
+    localMusic.customFolderName,
+    localMusic.customFolderDisplayPath,
+    localMusic.hasCustomFolder,
     localMusic.sourceMode,
     localMusic.sourceCounts,
     currentTrackMenuKey,
@@ -1343,11 +1349,21 @@ export default function App() {
       case 'settings_toggle_auto_scan':
         setAutoScan(!autoScan);
         break;
-      case 'settings_cycle_library_source':
-        setLibrarySource(current => {
-          const currentIndex = Math.max(0, LIBRARY_SOURCE_ORDER.indexOf(current));
-          return LIBRARY_SOURCE_ORDER[(currentIndex + 1) % LIBRARY_SOURCE_ORDER.length];
-        });
+      case 'settings_cycle_library_source': {
+        const currentIndex = Math.max(0, LIBRARY_SOURCE_ORDER.indexOf(librarySource));
+        const next = LIBRARY_SOURCE_ORDER[(currentIndex + 1) % LIBRARY_SOURCE_ORDER.length];
+        setLibrarySource(next);
+        if (next === 'custom' && !localMusic.hasCustomFolder) {
+          await localMusic.pickCustomFolder().catch(() => undefined);
+        }
+        break;
+      }
+      case 'settings_pick_custom_folder':
+        await localMusic.pickCustomFolder().catch(() => undefined);
+        if (librarySource !== 'custom') setLibrarySource('custom');
+        break;
+      case 'settings_clear_custom_folder':
+        await localMusic.clearCustomFolder().catch(() => undefined);
         break;
       case 'media_scan':
         await mediaLibrary.scanMedia();
@@ -1573,6 +1589,7 @@ export default function App() {
         writeString(CLICK_WHEEL_COLOR_KEY, 'white');
         writeUiSoundVolume(DEFAULT_UI_SOUND_VOLUME);
         writeString(SETTINGS_DEFAULTS_VERSION_KEY, SETTINGS_DEFAULTS_VERSION);
+        await localMusic.clearCustomFolder().catch(() => undefined);
         await setPlaybackMode('sequential');
         break;
       default:
