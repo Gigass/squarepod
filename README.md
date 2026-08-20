@@ -209,6 +209,16 @@ Library Source options:
 | `SquarePod` | `/sdcard/Music/SquarePod` and the app's external `Music` folder. This is the default. | Put user music in `/sdcard/Music/SquarePod`. |
 | `Android` | Android MediaStore audio library only. | Put music anywhere Android indexes as music, usually under `/sdcard/Music`. Game and emulator audio may also appear in this mode. |
 | `All` | SquarePod folders plus Android MediaStore. | Use only if you intentionally want both SquarePod-managed music and the full Android media library. |
+| `Custom` | A folder you pick with the Android system folder picker (Storage Access Framework). | Keep music where it already lives (for example an external SD card `Music` folder) and grant SquarePod access once. No copy into `/sdcard/Music/SquarePod` is required. |
+
+To use a custom folder such as an external SD card music directory:
+
+```text
+Settings -> Library -> Library Source -> Custom
+Settings -> Library -> Choose Custom Folder
+```
+
+Android opens the system folder picker. Select the SD card (or other volume), open the music folder, then confirm. SquarePod keeps a persistable read grant so later scans and playback work after reboot. Use **Clear Custom Folder** to revoke that grant.
 
 Do not use the app external folder as the normal manual import path:
 

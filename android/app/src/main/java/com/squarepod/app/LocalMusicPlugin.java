@@ -1,9 +1,12 @@
 package com.squarepod.app;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.ContentUris;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.UriPermission;
 import android.database.Cursor;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
@@ -13,14 +16,18 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.text.TextUtils;
+import androidx.activity.result.ActivityResult;
+import androidx.documentfile.provider.DocumentFile;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
@@ -52,13 +59,18 @@ import org.json.JSONObject;
 )
 public class LocalMusicPlugin extends Plugin {
     private static final String PLAYBACK_PREFS = "squarepod_local_playback";
+    private static final String LIBRARY_PREFS = "squarepod_local_library";
     private static final String PLAYBACK_STATE_KEY = "state";
+    private static final String CUSTOM_FOLDER_URI_KEY = "customFolderUri";
+    private static final String CUSTOM_FOLDER_NAME_KEY = "customFolderName";
     private static final String SOURCE_MODE_SQUAREPOD = "squarepod";
     private static final String SOURCE_MODE_ANDROID = "android";
     private static final String SOURCE_MODE_ALL = "all";
+    private static final String SOURCE_MODE_CUSTOM = "custom";
     private static final String SOURCE_APP_FOLDER = "appFolder";
     private static final String SOURCE_PUBLIC_SQUAREPOD = "publicSquarePod";
     private static final String SOURCE_MEDIA_STORE = "mediaStore";
+    private static final String SOURCE_CUSTOM_FOLDER = "customFolder";
     private static final long PERSIST_INTERVAL_MS = 5000;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<LocalTrack> queue = new ArrayList<>();
@@ -88,11 +100,16 @@ public class LocalMusicPlugin extends Plugin {
 
     @PluginMethod
     public void scanLibrary(PluginCall call) {
+        String sourceMode = normalizeSourceMode(call.getString("sourceMode", SOURCE_MODE_SQUAREPOD));
+        if (SOURCE_MODE_CUSTOM.equals(sourceMode)) {
+            call.resolve(scanPayload(sourceMode));
+            return;
+        }
         if (!hasAudioPermission()) {
             requestPermissionForAlias(permissionAlias(), call, "scanLibraryPermissionCallback");
             return;
         }
-        call.resolve(scanPayload(call.getString("sourceMode", SOURCE_MODE_SQUAREPOD)));
+        call.resolve(scanPayload(sourceMode));
     }
 
     @PermissionCallback
@@ -102,6 +119,75 @@ public class LocalMusicPlugin extends Plugin {
             return;
         }
         call.resolve(scanPayload(call.getString("sourceMode", SOURCE_MODE_SQUAREPOD)));
+    }
+
+    @PluginMethod
+    public void getCustomFolder(PluginCall call) {
+        call.resolve(customFolderPayload());
+    }
+
+    @PluginMethod
+    public void clearCustomFolder(PluginCall call) {
+        releaseCustomFolderPermission(customFolderUri());
+        libraryPrefs().edit()
+            .remove(CUSTOM_FOLDER_URI_KEY)
+            .remove(CUSTOM_FOLDER_NAME_KEY)
+            .apply();
+        call.resolve(customFolderPayload());
+    }
+
+    @PluginMethod
+    public void pickCustomFolder(PluginCall call) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(
+            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+        );
+        startActivityForResult(call, intent, "handlePickCustomFolder");
+    }
+
+    @ActivityCallback
+    private void handlePickCustomFolder(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null) {
+            call.reject("Folder selection cancelled.");
+            return;
+        }
+
+        Uri treeUri = result.getData().getData();
+        if (treeUri == null) {
+            call.reject("No folder was selected.");
+            return;
+        }
+
+        final int takeFlags = result.getData().getFlags()
+            & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        try {
+            getContext().getContentResolver().takePersistableUriPermission(
+                treeUri,
+                takeFlags == 0 ? Intent.FLAG_GRANT_READ_URI_PERMISSION : takeFlags
+            );
+        } catch (SecurityException error) {
+            call.reject("Unable to keep access to the selected folder: " + rootMessage(error));
+            return;
+        }
+
+        Uri previous = customFolderUri();
+        if (previous != null && !previous.equals(treeUri)) {
+            releaseCustomFolderPermission(previous);
+        }
+
+        DocumentFile root = DocumentFile.fromTreeUri(getContext(), treeUri);
+        String folderName = root != null && !TextUtils.isEmpty(root.getName())
+            ? root.getName()
+            : displayNameForTreeUri(treeUri);
+
+        libraryPrefs().edit()
+            .putString(CUSTOM_FOLDER_URI_KEY, treeUri.toString())
+            .putString(CUSTOM_FOLDER_NAME_KEY, folderName)
+            .apply();
+
+        call.resolve(customFolderPayload());
     }
 
     @PluginMethod
@@ -246,6 +332,7 @@ public class LocalMusicPlugin extends Plugin {
         int appFolderCount = 0;
         int publicSquarePodCount = 0;
         int mediaStoreCount = 0;
+        int customFolderCount = 0;
 
         if (SOURCE_MODE_SQUAREPOD.equals(normalizedSourceMode) || SOURCE_MODE_ALL.equals(normalizedSourceMode)) {
             List<LocalTrack> appFolderTracks = scanAppMusicDirectory(seen, seenPaths);
@@ -261,6 +348,12 @@ public class LocalMusicPlugin extends Plugin {
             List<LocalTrack> mediaStoreTracks = scanMediaStore(seen, seenPaths);
             mediaStoreCount = mediaStoreTracks.size();
             tracks.addAll(mediaStoreTracks);
+        }
+
+        if (SOURCE_MODE_CUSTOM.equals(normalizedSourceMode)) {
+            List<LocalTrack> customFolderTracks = scanCustomFolder(seen, seenPaths);
+            customFolderCount = customFolderTracks.size();
+            tracks.addAll(customFolderTracks);
         }
 
         Collections.sort(tracks, Comparator
@@ -279,10 +372,16 @@ public class LocalMusicPlugin extends Plugin {
         payload.put("musicDirectory", appMusicDirectory().getAbsolutePath());
         payload.put("publicMusicDirectory", publicSquarePodDirectory().getAbsolutePath());
         payload.put("sourceMode", normalizedSourceMode);
+        JSObject customFolder = customFolderPayload();
+        payload.put("customFolderUri", customFolder.getString("uri"));
+        payload.put("customFolderName", customFolder.getString("name"));
+        payload.put("customFolderDisplayPath", customFolder.getString("displayPath"));
+        payload.put("hasCustomFolder", !TextUtils.isEmpty(customFolder.getString("uri")));
         JSObject sourceCounts = new JSObject();
         sourceCounts.put(SOURCE_APP_FOLDER, appFolderCount);
         sourceCounts.put(SOURCE_PUBLIC_SQUAREPOD, publicSquarePodCount);
         sourceCounts.put(SOURCE_MEDIA_STORE, mediaStoreCount);
+        sourceCounts.put(SOURCE_CUSTOM_FOLDER, customFolderCount);
         payload.put("sourceCounts", sourceCounts);
         return payload;
     }
@@ -373,6 +472,105 @@ public class LocalMusicPlugin extends Plugin {
         if (!directory.exists()) return tracks;
         scanFilesRecursive(directory, seen, seenPaths, tracks, SOURCE_PUBLIC_SQUAREPOD);
         return tracks;
+    }
+
+    private List<LocalTrack> scanCustomFolder(Set<String> seen, Set<String> seenPaths) {
+        List<LocalTrack> tracks = new ArrayList<>();
+        Uri treeUri = customFolderUri();
+        if (treeUri == null) return tracks;
+        if (!hasPersistedReadPermission(treeUri)) {
+            releaseCustomFolderPermission(treeUri);
+            libraryPrefs().edit()
+                .remove(CUSTOM_FOLDER_URI_KEY)
+                .remove(CUSTOM_FOLDER_NAME_KEY)
+                .apply();
+            return tracks;
+        }
+
+        DocumentFile root = DocumentFile.fromTreeUri(getContext(), treeUri);
+        if (root == null || !root.exists() || !root.canRead()) return tracks;
+        scanDocumentRecursive(root, seen, seenPaths, tracks);
+        return tracks;
+    }
+
+    private void scanDocumentRecursive(
+        DocumentFile directory,
+        Set<String> seen,
+        Set<String> seenPaths,
+        List<LocalTrack> tracks
+    ) {
+        DocumentFile[] children = directory.listFiles();
+        if (children == null) return;
+
+        for (DocumentFile child : children) {
+            if (child.isDirectory()) {
+                scanDocumentRecursive(child, seen, seenPaths, tracks);
+                continue;
+            }
+            if (!child.isFile()) continue;
+            String name = child.getName();
+            if (TextUtils.isEmpty(name) || !isAudioFile(name)) continue;
+
+            Uri uri = child.getUri();
+            String uriString = uri.toString();
+            if (!seen.add(uriString)) continue;
+            seenPaths.add(uriString);
+            tracks.add(trackFromDocument(child, uriString));
+        }
+    }
+
+    private LocalTrack trackFromDocument(DocumentFile file, String uriString) {
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(getContext(), file.getUri());
+            String title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+            String artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
+            String album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM);
+            String albumArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST);
+            String genre = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE);
+            String duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            String trackNumber = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER);
+            String trackId = "doc_" + Math.abs(uriString.hashCode());
+            String displayName = file.getName();
+            return new LocalTrack(
+                trackId,
+                uriString,
+                safeTitle(title, displayName == null ? "Unknown Track" : displayName),
+                safeArtist(artist),
+                safeAlbum(album),
+                safeOptionalMetadata(albumArtist),
+                null,
+                safeGenre(genre),
+                parseDuration(duration),
+                parseTrackNumber(trackNumber),
+                writeArtwork(retriever.getEmbeddedPicture(), trackId),
+                readSidecarLyrics(file),
+                SOURCE_CUSTOM_FOLDER,
+                uriString
+            );
+        } catch (Throwable ignored) {
+            String displayName = file.getName();
+            return new LocalTrack(
+                "doc_" + Math.abs(uriString.hashCode()),
+                uriString,
+                safeTitle(null, displayName == null ? "Unknown Track" : displayName),
+                "Unknown Artist",
+                "Unknown Album",
+                null,
+                null,
+                "Unknown Genre",
+                1,
+                0,
+                null,
+                readSidecarLyrics(file),
+                SOURCE_CUSTOM_FOLDER,
+                uriString
+            );
+        } finally {
+            try {
+                retriever.release();
+            } catch (IOException ignored) {}
+        }
     }
 
     private void scanFilesRecursive(File directory, Set<String> seen, Set<String> seenPaths, List<LocalTrack> tracks, String source) {
@@ -826,7 +1024,170 @@ public class LocalMusicPlugin extends Plugin {
     private String normalizeSourceMode(String value) {
         if (SOURCE_MODE_ANDROID.equals(value)) return SOURCE_MODE_ANDROID;
         if (SOURCE_MODE_ALL.equals(value)) return SOURCE_MODE_ALL;
+        if (SOURCE_MODE_CUSTOM.equals(value)) return SOURCE_MODE_CUSTOM;
         return SOURCE_MODE_SQUAREPOD;
+    }
+
+    private SharedPreferences libraryPrefs() {
+        return getContext().getSharedPreferences(LIBRARY_PREFS, Context.MODE_PRIVATE);
+    }
+
+    private Uri customFolderUri() {
+        String raw = libraryPrefs().getString(CUSTOM_FOLDER_URI_KEY, null);
+        if (TextUtils.isEmpty(raw)) return null;
+        try {
+            return Uri.parse(raw);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private JSObject customFolderPayload() {
+        Uri uri = customFolderUri();
+        String name = libraryPrefs().getString(CUSTOM_FOLDER_NAME_KEY, null);
+        boolean selected = uri != null && hasPersistedReadPermission(uri);
+        if (uri != null && !selected) {
+            libraryPrefs().edit()
+                .remove(CUSTOM_FOLDER_URI_KEY)
+                .remove(CUSTOM_FOLDER_NAME_KEY)
+                .apply();
+            uri = null;
+            name = null;
+        }
+
+        if (selected && TextUtils.isEmpty(name)) {
+            DocumentFile root = DocumentFile.fromTreeUri(getContext(), uri);
+            name = root != null && !TextUtils.isEmpty(root.getName())
+                ? root.getName()
+                : displayNameForTreeUri(uri);
+        }
+
+        JSObject payload = new JSObject();
+        payload.put("selected", selected);
+        payload.put("uri", selected && uri != null ? uri.toString() : "");
+        payload.put("name", selected ? safe(name) : "");
+        payload.put("displayPath", selected ? customFolderDisplayPath(uri, name) : "");
+        return payload;
+    }
+
+    private String customFolderDisplayPath(Uri uri, String name) {
+        if (uri == null) return safe(name);
+        String documentId = null;
+        try {
+            documentId = DocumentsContract.getTreeDocumentId(uri);
+        } catch (Throwable ignored) {}
+        if (!TextUtils.isEmpty(documentId)) {
+            int colon = documentId.indexOf(':');
+            if (colon >= 0 && colon < documentId.length() - 1) {
+                String relative = documentId.substring(colon + 1);
+                if (!TextUtils.isEmpty(relative)) {
+                    return relative.startsWith("/") ? relative : "/" + relative;
+                }
+            }
+            if (!TextUtils.isEmpty(documentId)) return documentId;
+        }
+        return TextUtils.isEmpty(name) ? uri.toString() : name;
+    }
+
+    private String displayNameForTreeUri(Uri uri) {
+        String display = customFolderDisplayPath(uri, null);
+        if (TextUtils.isEmpty(display) || display.equals(uri.toString())) return "Custom folder";
+        int slash = display.lastIndexOf('/');
+        if (slash >= 0 && slash < display.length() - 1) return display.substring(slash + 1);
+        return display;
+    }
+
+    private boolean hasPersistedReadPermission(Uri uri) {
+        if (uri == null) return false;
+        for (UriPermission permission : getContext().getContentResolver().getPersistedUriPermissions()) {
+            if (uri.equals(permission.getUri()) && permission.isReadPermission()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void releaseCustomFolderPermission(Uri uri) {
+        if (uri == null) return;
+        try {
+            getContext().getContentResolver().releasePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            );
+        } catch (SecurityException ignored) {}
+    }
+
+    private List<LyricLine> readSidecarLyrics(DocumentFile audioFile) {
+        if (audioFile == null) return Collections.emptyList();
+        DocumentFile parent = audioFile.getParentFile();
+        String name = audioFile.getName();
+        if (parent == null || TextUtils.isEmpty(name)) return Collections.emptyList();
+        int extensionIndex = name.lastIndexOf('.');
+        if (extensionIndex <= 0) return Collections.emptyList();
+
+        DocumentFile lyricFile = parent.findFile(name.substring(0, extensionIndex) + ".lrc");
+        if (lyricFile == null || !lyricFile.exists() || !lyricFile.isFile()) {
+            return Collections.emptyList();
+        }
+
+        InputStream inputStream = openDocumentInput(lyricFile);
+        if (inputStream == null) return Collections.emptyList();
+
+        List<LyricLine> lines = new ArrayList<>();
+        List<String> rawLines = new ArrayList<>();
+        int offsetMs = 0;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+            String rawLine;
+            while ((rawLine = reader.readLine()) != null) {
+                String line = rawLine.replace("\uFEFF", "").trim();
+                if (line.isEmpty()) continue;
+                rawLines.add(line);
+
+                String lower = line.toLowerCase(Locale.ROOT);
+                if (lower.startsWith("[offset:") && line.endsWith("]")) {
+                    try {
+                        offsetMs = Integer.parseInt(line.substring(8, line.length() - 1).trim());
+                    } catch (Throwable ignored) {}
+                }
+            }
+
+            for (String line : rawLines) {
+                String lower = line.toLowerCase(Locale.ROOT);
+                if (lower.startsWith("[offset:") && line.endsWith("]")) continue;
+
+                List<Integer> timestamps = new ArrayList<>();
+                int cursor = 0;
+                while (cursor < line.length() && line.charAt(cursor) == '[') {
+                    int end = line.indexOf(']', cursor);
+                    if (end <= cursor) break;
+                    int time = parseLrcTimeMs(line.substring(cursor + 1, end));
+                    if (time >= 0) timestamps.add(time);
+                    cursor = end + 1;
+                }
+
+                if (timestamps.isEmpty()) continue;
+                String text = line.substring(cursor).trim();
+                if (text.isEmpty()) continue;
+                for (int timestamp : timestamps) {
+                    int seconds = Math.max(0, Math.round((timestamp + offsetMs) / 1000f));
+                    lines.add(new LyricLine(seconds, text));
+                }
+            }
+        } catch (Throwable ignored) {
+            return Collections.emptyList();
+        }
+
+        Collections.sort(lines, Comparator.comparingInt(line -> line.time));
+        return lines;
+    }
+
+    private InputStream openDocumentInput(DocumentFile file) {
+        if (file == null) return null;
+        try {
+            return getContext().getContentResolver().openInputStream(file.getUri());
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private String extractEmbeddedArtwork(String path, String trackId) {

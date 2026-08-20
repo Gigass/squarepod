@@ -115,6 +115,9 @@ export interface LocalMusicMenuState {
   tracks?: LocalMusicTrack[];
   musicDirectory?: string;
   publicMusicDirectory?: string;
+  customFolderName?: string;
+  customFolderDisplayPath?: string;
+  hasCustomFolder?: boolean;
   sourceMode?: LocalMusicSourceMode;
   sourceCounts?: Partial<Record<LocalMusicTrackSource, number>>;
   currentTrack?: LocalMusicTrack;
@@ -375,7 +378,7 @@ const stableHash = (value: string) => {
 const stableNodeId = (prefix: string, value: string) => `${prefix}_${stableHash(value || 'unknown')}`;
 
 const normalizeLocalSourceMode = (mode?: LocalMusicSourceMode): LocalMusicSourceMode => (
-  mode === 'android' || mode === 'all' ? mode : 'squarepod'
+  mode === 'android' || mode === 'all' || mode === 'custom' ? mode : 'squarepod'
 );
 
 const librarySourceLabel = (mode: LocalMusicSourceMode | undefined, locale: Locale = 'en') => {
@@ -384,6 +387,8 @@ const librarySourceLabel = (mode: LocalMusicSourceMode | undefined, locale: Loca
       return tx(locale, 'Android', 'Android');
     case 'all':
       return tx(locale, 'All', '全部');
+    case 'custom':
+      return tx(locale, 'Custom', '自定义');
     case 'squarepod':
     default:
       return 'SquarePod';
@@ -396,6 +401,8 @@ const librarySourceDetail = (mode: LocalMusicSourceMode | undefined, locale: Loc
       return tx(locale, 'Android media library only.', '仅 Android 媒体库。');
     case 'all':
       return tx(locale, 'SquarePod folders and Android media library.', 'SquarePod 文件夹和 Android 媒体库。');
+    case 'custom':
+      return tx(locale, 'User-selected folder only.', '仅用户选择的文件夹。');
     case 'squarepod':
     default:
       return tx(locale, 'SquarePod folders only.', '仅 SquarePod 音乐文件夹。');
@@ -629,11 +636,17 @@ const generateLocalMusicChildren = (state: LocalMusicMenuState = {}): MenuNode[]
         state.message || tx(locale, 'Scan local audio files.', '扫描本地音频文件。'),
         countText(locale, tracks.length, 'song cached', 'songs cached', '首歌曲已缓存'),
         tx(locale, 'Source: {source}', '来源：{source}', { source: librarySourceLabel(state.sourceMode, locale) }),
-        state.publicMusicDirectory
-          ? tx(locale, 'Music folder: {path}', '音乐文件夹：{path}', { path: state.publicMusicDirectory })
-          : state.musicDirectory
-            ? tx(locale, 'App folder: {path}', '应用文件夹：{path}', { path: state.musicDirectory })
-            : librarySourceDetail(state.sourceMode, locale),
+        normalizeLocalSourceMode(state.sourceMode) === 'custom'
+          ? (state.customFolderDisplayPath || state.customFolderName
+            ? tx(locale, 'Custom folder: {path}', '自定义文件夹：{path}', {
+              path: state.customFolderDisplayPath || state.customFolderName || '',
+            })
+            : tx(locale, 'No custom folder selected.', '未选择自定义文件夹。'))
+          : state.publicMusicDirectory
+            ? tx(locale, 'Music folder: {path}', '音乐文件夹：{path}', { path: state.publicMusicDirectory })
+            : state.musicDirectory
+              ? tx(locale, 'App folder: {path}', '应用文件夹：{path}', { path: state.musicDirectory })
+              : librarySourceDetail(state.sourceMode, locale),
       ],
     },
   ];
@@ -2357,9 +2370,37 @@ const generateSettingsMenu = (local: LocalMusicMenuState = {}): MenuNode => {
             statusTone: normalizeLocalSourceMode(local.sourceMode) === 'squarepod' ? 'success' : 'warning',
             detailLines: [
               librarySourceDetail(local.sourceMode, locale),
-              'SquarePod / Android / All',
+              'SquarePod / Android / All / Custom',
             ],
           },
+          {
+            id: 'set_custom_folder',
+            title: local.hasCustomFolder
+              ? tx(locale, 'Custom Folder: {name}', '自定义文件夹：{name}', {
+                name: local.customFolderName || local.customFolderDisplayPath || tx(locale, 'Selected', '已选择'),
+              })
+              : tx(locale, 'Choose Custom Folder', '选择自定义文件夹'),
+            type: 'localMusicStatus',
+            action: 'settings_pick_custom_folder',
+            statusTone: local.hasCustomFolder ? 'success' : 'neutral',
+            detailLines: [
+              local.customFolderDisplayPath || local.customFolderName
+                || tx(locale, 'Pick a folder such as SD card Music.', '选择文件夹，例如 SD 卡 Music。'),
+              tx(locale, 'Uses Android folder picker (SAF).', '使用 Android 文件夹选择器（SAF）。'),
+            ],
+          },
+          ...(local.hasCustomFolder
+            ? [{
+              id: 'set_clear_custom_folder',
+              title: tx(locale, 'Clear Custom Folder', '清除自定义文件夹'),
+              type: 'localMusicStatus' as const,
+              action: 'settings_clear_custom_folder' as const,
+              statusTone: 'warning' as const,
+              detailLines: [
+                tx(locale, 'Remove the saved custom folder grant.', '移除已保存的自定义文件夹授权。'),
+              ],
+            }]
+            : []),
           {
             id: 'set_auto_scan',
             title: `${t(locale, 'autoScan')}: ${enabledLabel(local.autoScan !== false, locale)}`,
